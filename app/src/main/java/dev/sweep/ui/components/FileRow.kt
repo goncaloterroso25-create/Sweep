@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -41,6 +44,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -60,8 +65,10 @@ import java.io.File
  * A selectable file. Every row states its size and why it was suggested, and duplicate rows also
  * name the copy that will survive — the single most reassuring thing this screen can say.
  *
- * Long-press adds the file to the local exclusion list instead of hiding the option in a menu
- * the user has to go hunting for.
+ * The two gestures are deliberately different targets, because they have very different
+ * consequences: the checkbox marks the file for deletion, tapping anywhere else opens its details
+ * so the user can look before deciding. Long-press still adds the file to the local exclusion
+ * list rather than hiding that option in a menu nobody finds.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -69,6 +76,7 @@ fun FileRow(
     item: CleanupItem,
     selected: Boolean,
     onToggle: () -> Unit,
+    onOpen: () -> Unit,
     onExclude: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -97,14 +105,31 @@ fun FileRow(
                 .combinedClickable(
                     interactionSource = interaction,
                     indication = null,
-                    onClick = onToggle,
+                    onClickLabel = "Show details for ${item.name}",
+                    onClick = onOpen,
                     onLongClick = { menuOpen = true },
                 )
-                .padding(horizontal = 12.dp, vertical = 12.dp),
+                .padding(start = 4.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SelectionBox(selected = selected)
-            Spacer(Modifier.width(12.dp))
+            // Its own target, sized for a thumb: this is the control that decides what gets
+            // deleted, and it must never be hit by someone meaning to look at the file.
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .toggleable(
+                        value = selected,
+                        onValueChange = { onToggle() },
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    )
+                    .semantics { contentDescription = "Select ${item.name} for deletion" },
+                contentAlignment = Alignment.Center,
+            ) {
+                SelectionBox(selected = selected)
+            }
+            Spacer(Modifier.width(4.dp))
             FileGlyph(item)
             Spacer(Modifier.width(12.dp))
 
@@ -143,6 +168,15 @@ fun FileRow(
                 text = if (item.isDirectory) "—" else ByteFormat.short(item.size),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.text,
+            )
+            // Quiet affordance for the other half of the row: there is more to see here.
+            Icon(
+                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = colors.textFaint,
+                modifier = Modifier
+                    .padding(start = 2.dp)
+                    .size(18.dp),
             )
         }
 
@@ -269,4 +303,18 @@ fun SelectionBox(selected: Boolean, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/** Small pill used for the "why" facts that do not fit on the summary line. */
+@Composable
+fun ReasonChip(text: String, modifier: Modifier = Modifier, tint: Color = Sweep.colors.textMute) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = tint,
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(tint.copy(alpha = 0.10f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    )
 }

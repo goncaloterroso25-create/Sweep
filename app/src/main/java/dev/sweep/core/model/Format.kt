@@ -39,6 +39,16 @@ object ByteFormat {
         format(bytes, locale).toString()
 }
 
+/** Calendar dates, for the file details sheet where "4 months ago" is too vague to act on. */
+object DateFormat {
+
+    fun day(millis: Long, locale: Locale = Locale.getDefault()): String {
+        if (millis <= 0L) return "Unknown"
+        val format = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, locale)
+        return format.format(java.util.Date(millis))
+    }
+}
+
 /** Human wording for "how long ago", used for the reason chips. */
 object AgeFormat {
 

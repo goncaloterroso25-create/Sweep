@@ -49,68 +49,61 @@ Android does not allow Sweep to directly clear another application's cache, so t
 
 This behavior works correctly.
 
+The old **Open Android Cache Management** button has been removed. It did not work reliably on either test device, and the per-app storage page already covers the same need.
+
+#### File preview
+
+Files can be inspected before they are deleted.
+
+Tapping a row opens a details sheet with a thumbnail for images and videos, plus the filename, folder, size and modified date. For duplicates it also names the copy that will be kept.
+
+From there, **Open** hands the file to whichever app the device already uses for that type, through a read-only permission granted for that one file. If nothing installed can open it, Sweep says so.
+
+Selecting and opening are separate actions. The checkbox marks a file for deletion, tapping the row inspects it.
+
+#### Haptic feedback
+
+Haptic feedback now works on the test devices.
+
+It is used sparingly: selecting a file, excluding one, confirming a deletion and finishing a cleanup.
+
+The earlier problem was that `performHapticFeedback` is a request Android can silently ignore, and the return value was being discarded. Sweep now asks in a way the platform accepts and checks the result.
+
+Settings includes a **Test haptic** action that triggers the real confirmation feedback and reports what happened. Android's own touch-feedback setting still takes priority, and Sweep does not claim to override it.
+
 ---
 
 ## Known issues
 
 ### Unused apps
 
-This feature currently needs more testing and adjustment.
+This is still the weakest feature, and it remains **experimental**.
 
-Sweep uses Android usage information to estimate when an application was last opened, but testing on physical devices showed that some results were inaccurate or incomplete.
+An earlier version treated "Android has no usage record" as evidence that an app was unused, which meant apps opened that same morning could be listed as forgotten. That is fixed. An app is now only called unused when Android reported a real last-opened date older than the chosen threshold.
 
-For now, I consider the **unused apps feature experimental** rather than fully functional.
+Everything else goes into a separate **Usage unknown** section, which is excluded from the unused count, excluded from the reclaimable total, and offered an app-info action instead of an uninstall button.
 
-Possible solutions include:
+The remaining problem is coverage rather than honesty. On a Samsung test device almost every installed app ends up under Usage unknown, so the feature is accurate but not yet useful there.
 
-- improving how `UsageStats` data is interpreted;
-- distinguishing between reliable and unavailable usage history;
-- clearly informing the user when Android does not provide enough historical information.
+Still to investigate:
 
-### Haptic feedback
-
-Haptic feedback is currently implemented in the interface, but **does not appear to work during physical-device testing**.
-
-This affects interactions that are intended to provide tactile feedback, such as selections, confirmations and cleanup completion.
-
-The implementation needs to be investigated to determine whether the issue is related to the current haptic implementation, device compatibility, Android settings or vibration permissions.
-
-For now, haptic feedback should be considered **non-functional**.
-
-### Android cache management shortcut
-
-The **Open Android Cache Management** button currently does not work reliably.
-
-Since users can already open the storage page of individual applications directly from Sweep, this button may simply be removed.
+- whether reading raw usage events gives better results than aggregated `UsageStats`;
+- whether device-specific app sleeping behavior affects the data Sweep receives;
+- whether the feature is worth keeping if Android cannot supply usable history.
 
 ---
 
 ## Planned improvements
 
-### File preview
-
-Before deleting a file, the user should be able to inspect it.
-
-Planned support includes opening or previewing:
-
-- Images
-- Videos
-- Documents
-- APK files
-- Archives
-- Other detected files
-
-This should make it easier to verify that something is actually unnecessary before deleting it.
-
 ### Improve unused-app detection
 
-The unused-app system needs additional work before it can be considered reliable.
+The unused-app system needs more work before it can be considered reliable.
 
-The UI should also clearly communicate when Android does not have enough usage history to determine when an application was last opened.
+Sweep already tells the user when Android has no usage history for an app. The open question is whether a different data source produces enough real last-opened dates to make the feature worth keeping at all.
 
-### Haptics
+### Interface polish
 
-Investigate and fix the current haptic-feedback implementation across supported devices.
+Motion, scanning feedback and the app's visual identity are the next area of work.
 
 ### Malware scanning
 
@@ -153,6 +146,7 @@ File scanning and storage analysis do not require an account or cloud service.
 - Android Storage APIs
 - UsageStatsManager
 - StorageStatsManager
+- FileProvider, for file preview
 - Coroutines / Flow
 - DataStore
 
@@ -166,11 +160,10 @@ Core storage scanning and cleanup functionality works, but several areas still r
 
 The next development phase will focus mainly on:
 
-- file previews;
-- unused-app accuracy;
-- haptic feedback;
-- additional physical-device testing;
+- unused-app accuracy, or removing the feature;
 - UI/UX and animation polish;
+- the app's visual identity;
+- additional physical-device testing;
 - edge cases and reliability.
 
 ---

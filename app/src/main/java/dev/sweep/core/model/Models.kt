@@ -27,12 +27,6 @@ sealed interface Reason {
     data object EmptyFolder : Reason
     data class CopySuffix(val suffix: String) : Reason
     data class LastOpened(val days: Int) : Reason
-
-    /**
-     * Android keeps roughly two years of usage history, so "no record" is not the same as
-     * "never opened". The UI must word it that way.
-     */
-    data object NoUsageRecord : Reason
 }
 
 /** Extra context for an item that is a redundant copy of another file. */

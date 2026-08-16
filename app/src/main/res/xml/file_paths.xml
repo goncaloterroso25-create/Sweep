@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sweep hands files to other apps to be *viewed*, never to be written, and the files it lists can
+  sit anywhere in shared storage or on an SD card. root-path covers that; the grant is read-only
+  and per-file, issued one tap at a time by FileProvider.
+-->
+<paths>
+    <external-path name="shared" path="." />
+    <root-path name="device" path="/" />
+</paths>

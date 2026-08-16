@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.media.MediaScannerConnection
 import android.net.Uri
-import android.os.Build
-import android.os.storage.StorageManager
 import android.provider.Settings
 
 /**
@@ -14,8 +12,12 @@ import android.provider.Settings
  *
  * Three things a third-party app genuinely cannot do, and what Sweep does instead:
  *  - uninstall an app silently        -> launch the system uninstall dialog and verify afterwards
- *  - clear another app's cache        -> launch Android's own "clear cached data" flow (API 31+)
- *  - clear one app's cache            -> open that app's storage page in Settings
+ *  - clear another app's cache        -> open that app's storage page in Settings
+ *  - turn on system haptics           -> open Android's sound & vibration settings
+ *
+ * Android 12's `ACTION_CLEAR_APP_CACHE` dialog used to be offered here as a fourth. It is gone:
+ * on the devices Sweep was tested on it either did nothing or opened an unrelated screen, and a
+ * button whose behaviour depends on the OEM is worse than no button.
  */
 object SystemFlows {
 
@@ -26,19 +28,16 @@ object SystemFlows {
     fun appDetailsIntent(packageName: String): Intent =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
 
-    /**
-     * Android 12+ exposes a system dialog that clears cached data across all apps. This is the
-     * only supported way for Sweep to affect another app's cache, and the OS — not Sweep —
-     * performs and confirms the work.
-     */
-    fun clearAllCachesIntent(): Intent? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Intent(StorageManager.ACTION_CLEAR_APP_CACHE)
-        } else {
-            null
-        }
-
     fun storageSettingsIntent(): Intent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
+
+    /**
+     * Where touch feedback is turned on. Sweep's haptics setting cannot override the system one,
+     * so when the system's is off this is the only useful thing to offer.
+     */
+    fun soundSettingsIntents(): List<Intent> = listOf(
+        Intent(Settings.ACTION_SOUND_SETTINGS),
+        Intent(Settings.ACTION_SETTINGS),
+    )
 
     fun isInstalled(context: Context, packageName: String): Boolean = try {
         context.packageManager.getPackageInfo(packageName, 0)

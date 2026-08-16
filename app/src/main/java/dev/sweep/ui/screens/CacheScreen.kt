@@ -1,7 +1,6 @@
 package dev.sweep.ui.screens
 
 import android.graphics.drawable.Drawable
-import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -60,8 +59,12 @@ import dev.sweep.ui.theme.Sweep
  *
  * Android does not let one app delete another app's cache. Every "cleaner" that claims otherwise
  * is either measuring nothing or clearing its own files. What Sweep can honestly do is read the
- * per-app cache sizes (with Usage Access), hand the user to Android's own bulk cache dialog on
- * Android 12+, open a specific app's storage page, and clear its own cache.
+ * per-app cache sizes (with Usage Access), open a specific app's storage page so the user can
+ * clear it there, and clear its own cache.
+ *
+ * There used to be a button here for Android 12's `ACTION_CLEAR_APP_CACHE` dialog. It was removed
+ * after device testing: on both phones tried it either did nothing or landed somewhere unrelated,
+ * and a prominent button that behaves differently per OEM is worse than no button at all.
  */
 @Composable
 fun CacheScreen(
@@ -103,42 +106,12 @@ fun CacheScreen(
             item {
                 NoticeCard(
                     title = "Android owns this one",
-                    body = "No app can delete another app's cache — Android blocks it, and Sweep " +
-                        "will never claim to have done it. What Sweep can do is show you where " +
-                        "the cached data is and open the system tool that clears it.",
+                    body = "Sweep can measure how much each app has cached, and that is where its " +
+                        "power ends: Android does not let one app delete another app's cache, and " +
+                        "Sweep will never claim to have done it. Tap Manage on any app below to " +
+                        "open its storage page, where you can clear the cache yourself.",
                     icon = Icons.Outlined.Cached,
                     tint = colors.categoryTint(dev.sweep.core.model.CleanupCategory.SCREENSHOTS),
-                    action = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                SweepButton(
-                                    text = "Open Android's cache cleanup",
-                                    onClick = {
-                                        SystemFlows.clearAllCachesIntent()?.let {
-                                            SystemFlows.launchFirstAvailable(context, listOf(it))
-                                        }
-                                    },
-                                )
-                            } else {
-                                SweepButton(
-                                    text = "Open storage settings",
-                                    onClick = {
-                                        SystemFlows.launchFirstAvailable(
-                                            context,
-                                            listOf(SystemFlows.storageSettingsIntent()),
-                                        )
-                                    },
-                                )
-                                Text(
-                                    text = "Android 12 added a system dialog that clears every " +
-                                        "app's cache at once. On this device you'll clear caches " +
-                                        "from each app's storage page instead.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colors.textFaint,
-                                )
-                            }
-                        }
-                    },
                 )
             }
 
@@ -180,8 +153,7 @@ fun CacheScreen(
                     NoticeCard(
                         title = "Cache sizes need Usage Access",
                         body = "Android reports per-app storage only to apps with Usage Access. " +
-                            "Without it Sweep can still open the system cleanup, but it can't " +
-                            "tell you which apps are worth clearing.",
+                            "Without it Sweep can't tell you which apps are worth clearing.",
                         icon = Icons.Outlined.Schedule,
                         tint = colors.info,
                         action = {
@@ -197,7 +169,20 @@ fun CacheScreen(
                         },
                     )
                 }
-            } else if (cached.isNotEmpty()) {
+            } else if (cached.isEmpty()) {
+                item {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = if (state.apps == null) {
+                            "Reading app sizes…"
+                        } else {
+                            "No app on this device is holding a measurable cache right now."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textMute,
+                    )
+                }
+            } else {
                 item {
                     Spacer(Modifier.height(6.dp))
                     SectionLabel("Biggest caches")

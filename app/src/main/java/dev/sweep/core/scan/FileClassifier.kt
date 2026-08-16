@@ -72,6 +72,15 @@ object FileClassifier {
         return lower.startsWith("screenshot") || lower.startsWith("screen_shot")
     }
 
+    fun isScreenRecording(path: String, name: String): Boolean {
+        if (extensionOf(name) !in VIDEO_EXTENSIONS) return false
+        val normalised = path.replace('\\', '/')
+        if (normalised.contains("/Screen recordings/", ignoreCase = true)) return true
+        val lower = name.lowercase(Locale.ROOT)
+        return lower.startsWith("screenrecord") || lower.startsWith("screen_record") ||
+            lower.startsWith("screen recording")
+    }
+
     fun isInDownloads(path: String): Boolean {
         val normalised = path.replace('\\', '/')
         return normalised.contains("/Download/", ignoreCase = true) ||

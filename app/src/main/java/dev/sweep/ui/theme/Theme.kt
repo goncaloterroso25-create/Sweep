@@ -35,7 +35,7 @@ object Sweep {
 @Composable
 fun SweepTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    motionPreference: MotionPreference = MotionPreference.SYSTEM,
+    motionPreference: MotionPreference = MotionPreference.STANDARD,
     content: @Composable () -> Unit,
 ) {
     val colors = if (darkTheme) DarkColors else LightColors
@@ -51,11 +51,9 @@ fun SweepTheme(
         }.getOrDefault(false)
     }
 
-    val reducedMotion = when (motionPreference) {
-        MotionPreference.REDUCED -> true
-        MotionPreference.FULL -> false
-        MotionPreference.SYSTEM -> systemAnimationsOff
-    }
+    // Standard still yields to Android: if the user has switched animations off system-wide,
+    // Sweep is not the app that argues with that. That is behaviour, not a third option.
+    val reducedMotion = motionPreference == MotionPreference.REDUCED || systemAnimationsOff
 
     // Material components still need a scheme; it is derived from the Sweep palette so a stray
     // M3 default can never introduce a colour that is not part of the design.

@@ -25,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +45,9 @@ import dev.sweep.core.scan.UnusedAppPolicy
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.ButtonTone
 import dev.sweep.ui.components.HairLine
+import dev.sweep.ui.components.HapticProbe
 import dev.sweep.ui.components.SectionLabel
+import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.components.SweepTopBar
@@ -53,6 +58,7 @@ import dev.sweep.ui.theme.springSnappy
 @Composable
 fun SettingsScreen(
     state: SweepUiState,
+    haptics: SweepHaptics,
     onBack: () -> Unit,
     onOldFileThreshold: (Int) -> Unit,
     onLargeFileThreshold: (Long) -> Unit,
@@ -122,19 +128,23 @@ fun SettingsScreen(
 
             ToggleRow(
                 title = "Haptics",
-                caption = "A short tick when you select, confirm or finish.",
+                caption = "A short tick when you select, confirm or finish. Android's own touch " +
+                    "feedback setting still has the final say.",
                 checked = settings.hapticsEnabled,
                 onChange = onHaptics,
             )
+            HapticTestRow(haptics = haptics)
+
+            Spacer(Modifier.height(4.dp))
             ChoiceRow(
                 title = "Motion",
-                caption = "Reduced follows the same idea as Android's animation setting.",
+                caption = "Reduced removes springs, staggers and moving decoration. If you've " +
+                    "turned animations off in Android, Sweep follows that either way.",
                 options = MotionPreference.entries.toList(),
                 selected = settings.motion,
                 label = {
                     when (it) {
-                        MotionPreference.SYSTEM -> "System"
-                        MotionPreference.FULL -> "Full"
+                        MotionPreference.STANDARD -> "Standard"
                         MotionPreference.REDUCED -> "Reduced"
                     }
                 },
@@ -219,6 +229,89 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(40.dp))
             Spacer(Modifier.navigationBarsPadding())
+        }
+    }
+}
+
+/**
+ * One tap, one honest answer.
+ *
+ * Haptics are the one part of the app that cannot be verified by looking at it, and Sweep's switch
+ * is not the only switch involved. So the test fires the real confirmation haptic, then says which
+ * of the three things that could be wrong actually is — and offers the system screen when the
+ * answer is Android's setting rather than Sweep's.
+ */
+@Composable
+private fun HapticTestRow(haptics: SweepHaptics) {
+    val colors = Sweep.colors
+    val context = LocalContext.current
+    var probe by remember { mutableStateOf<HapticProbe?>(null) }
+
+    Column(Modifier.padding(bottom = 18.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(colors.surface)
+                .border(1.dp, colors.line, MaterialTheme.shapes.medium)
+                .padding(15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Test haptic",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.text,
+                )
+                Text(
+                    text = "Fires the confirmation tick, even if Sweep's switch is off.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textMute,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            SweepButton(
+                text = "Test",
+                onClick = { probe = haptics.test() },
+                tone = ButtonTone.Neutral,
+                dense = true,
+            )
+        }
+
+        probe?.let { result ->
+            Spacer(Modifier.height(9.dp))
+            Text(
+                text = when {
+                    !result.systemFeedbackEnabled ->
+                        "Android's touch feedback is switched off, so nothing will be felt. " +
+                            "Sweep's setting cannot override that."
+                    !result.accepted ->
+                        "Android declined the request — this device doesn't provide haptic " +
+                            "feedback for it."
+                    !result.appSettingEnabled ->
+                        "Android accepted it. Sweep's own haptics are currently off, so this " +
+                            "was the only buzz you'll get."
+                    else ->
+                        "Android accepted it. If you felt nothing, check vibration intensity in " +
+                            "your device's sound settings."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (result.systemFeedbackEnabled && result.accepted) {
+                    colors.textMute
+                } else {
+                    colors.danger
+                },
+            )
+            if (!result.systemFeedbackEnabled || !result.accepted) {
+                Spacer(Modifier.height(8.dp))
+                SweepTextButton(
+                    text = "Open sound settings",
+                    onClick = {
+                        SystemFlows.launchFirstAvailable(context, SystemFlows.soundSettingsIntents())
+                    },
+                    color = colors.accent,
+                )
+            }
         }
     }
 }

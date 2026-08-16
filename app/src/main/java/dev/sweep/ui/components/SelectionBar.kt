@@ -91,3 +91,11 @@ fun SelectionBar(
         }
     }
 }
+
+/** Bottom-anchored container that keeps the bar clear of the gesture area. */
+@Composable
+fun BottomBarSlot(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
+        content()
+    }
+}

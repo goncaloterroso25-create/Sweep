@@ -15,7 +15,15 @@ import dev.sweep.core.model.ScanConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-enum class MotionPreference { SYSTEM, REDUCED, FULL }
+/**
+ * Two options, because there were three and one of them was a lie.
+ *
+ * "System" and "Full" behaved identically on any device with animations left on, which is nearly
+ * all of them, so the setting looked like it did nothing. [STANDARD] now covers both: Sweep's
+ * normal motion, which still collapses automatically when Android's animator duration scale is
+ * zero. Older stored values simply fall back to [STANDARD].
+ */
+enum class MotionPreference { STANDARD, REDUCED }
 
 data class SweepSettings(
     val oldFileThresholdDays: Int = 60,
@@ -23,7 +31,7 @@ data class SweepSettings(
     val oldScreenshotThresholdDays: Int = 180,
     val unusedAppThresholdDays: Int = 90,
     val hapticsEnabled: Boolean = true,
-    val motion: MotionPreference = MotionPreference.SYSTEM,
+    val motion: MotionPreference = MotionPreference.STANDARD,
     val onboardingComplete: Boolean = false,
     val excludedPaths: Set<String> = emptySet(),
     val excludedPackages: Set<String> = emptySet(),
@@ -50,9 +58,11 @@ class SweepSettingsStore(private val context: Context) {
             oldScreenshotThresholdDays = prefs[SCREENSHOT_DAYS] ?: 180,
             unusedAppThresholdDays = prefs[UNUSED_APP_DAYS] ?: 90,
             hapticsEnabled = prefs[HAPTICS] ?: true,
+            // A stored "SYSTEM" or "FULL" from the three-option version no longer parses, and
+            // falling back to STANDARD is exactly what both of them used to do.
             motion = prefs[MOTION]
                 ?.let { runCatching { MotionPreference.valueOf(it) }.getOrNull() }
-                ?: MotionPreference.SYSTEM,
+                ?: MotionPreference.STANDARD,
             onboardingComplete = prefs[ONBOARDING] ?: false,
             excludedPaths = prefs[EXCLUDED_PATHS] ?: emptySet(),
             excludedPackages = prefs[EXCLUDED_PACKAGES] ?: emptySet(),

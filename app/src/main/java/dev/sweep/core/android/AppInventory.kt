@@ -24,8 +24,9 @@ import java.util.concurrent.TimeUnit
  * Two Android limits shape this and are surfaced honestly in the UI:
  *  - Package visibility (Android 11+) means the list is only complete because Sweep declares
  *    QUERY_ALL_PACKAGES. Without it Android would hide most of the device's apps.
- *  - Usage history is retained for roughly two years, so "no usage record" is reported as
- *    exactly that, never as "never opened".
+ *  - Usage history is retained for roughly two years, and some devices return nothing at all for
+ *    an app even with Usage Access granted. A missing timestamp therefore means "unknown", never
+ *    "never opened" and never "unused" — see [UnusedAppPolicy].
  */
 class AppInventory(private val context: Context) {
 
@@ -52,9 +53,12 @@ class AppInventory(private val context: Context) {
             .sortedByDescending { it.totalBytes }
             .toList()
 
+        val evaluated = UnusedAppPolicy.find(apps, thresholdDays, now, excludedPackages)
+
         AppScanResult(
             apps = apps,
-            unused = UnusedAppPolicy.find(apps, thresholdDays, now, excludedPackages),
+            unused = evaluated.unused,
+            unknownUsage = evaluated.unknownUsage,
             thresholdDays = thresholdDays,
             hasUsageAccess = hasUsageAccess,
         )

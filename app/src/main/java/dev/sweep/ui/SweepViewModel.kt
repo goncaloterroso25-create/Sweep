@@ -141,6 +141,20 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Re-reads the storage figures alone.
+     *
+     * The free-space headline is the one number the user acts on, so it is refreshed at every
+     * moment it could have moved — before a scan, when one finishes, after a deletion — rather
+     * than only on resume. Permissions cannot change without leaving the app, so this skips them.
+     */
+    fun refreshStorage() {
+        viewModelScope.launch {
+            val storage = withContext(Dispatchers.IO) { repository.storage() }
+            _state.update { it.copy(storage = storage) }
+        }
+    }
+
     // ---- scanning ---------------------------------------------------------------------------
 
     fun startScan() {
@@ -157,6 +171,7 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
                 scanWasCancelled = false,
             )
         }
+        refreshStorage()
         scanJob = viewModelScope.launch {
             val settings = _state.value.settings
             repository.scanFiles(
@@ -167,17 +182,21 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
                 .collect { update ->
                     when (update) {
                         is ScanUpdate.Progress -> _state.update { it.copy(progress = update) }
-                        is ScanUpdate.Complete -> _state.update {
-                            it.copy(
-                                stage = Stage.RESULTS,
-                                result = update.result,
-                                scanWasCancelled = update.result.stoppedEarly,
-                                progress = null,
-                                selectedPaths = update.result.items
-                                    .filter { item -> item.isSafeSuggestion }
-                                    .map { item -> item.path }
-                                    .toSet(),
-                            )
+                        is ScanUpdate.Complete -> {
+                            // A long scan can outlive the figures shown when it started.
+                            refreshStorage()
+                            _state.update {
+                                it.copy(
+                                    stage = Stage.RESULTS,
+                                    result = update.result,
+                                    scanWasCancelled = update.result.stoppedEarly,
+                                    progress = null,
+                                    selectedPaths = update.result.items
+                                        .filter { item -> item.isSafeSuggestion }
+                                        .map { item -> item.path }
+                                        .toSet(),
+                                )
+                            }
                         }
                     }
                 }

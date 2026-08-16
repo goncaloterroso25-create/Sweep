@@ -8,8 +8,10 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
 
 /**
- * Sweep keeps typography deliberately simple in the public repository build.
- * Headlines and body copy use Android's system sans-serif family with different weights and scales.
+ * Typography roles stay intentionally simple in the repository build.
+ *
+ * Headings and numeric values use the system sans-serif family with stronger weight and tighter
+ * tracking, while body copy uses the same family at calmer weights for readability.
  */
 val Grotesk = FontFamily.SansSerif
 val Inter = FontFamily.SansSerif

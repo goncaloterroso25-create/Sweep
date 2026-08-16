@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -38,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -48,7 +51,7 @@ import dev.sweep.core.android.SweepPermissions
 import dev.sweep.core.android.SystemFlows
 import dev.sweep.core.model.AgeFormat
 import dev.sweep.core.model.ByteFormat
-import dev.sweep.core.model.UnusedApp
+import dev.sweep.core.model.InstalledApp
 import dev.sweep.core.scan.UnusedAppPolicy
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.EmptyState
@@ -61,11 +64,14 @@ import dev.sweep.ui.components.pressable
 import dev.sweep.ui.theme.Sweep
 
 /**
- * Apps the device says you have stopped opening.
+ * Apps the device says you have stopped opening — and, separately, the apps it says nothing about.
  *
- * Sweep cannot uninstall anything itself — no third-party app can — so the action here opens
- * Android's own uninstall dialog and then re-reads the package list to report what actually
- * happened. Nothing is counted as removed unless the package is genuinely gone.
+ * The split matters more than anything else on this screen. Only an app with a real last-used date
+ * older than the threshold is called unused; everything Android stayed quiet about is listed under
+ * "Usage unknown", counted nowhere, and offered no uninstall shortcut.
+ *
+ * Sweep cannot uninstall anything itself — no third-party app can — so the action opens Android's
+ * own uninstall dialog and then re-reads the package list to report what actually happened.
  */
 @Composable
 fun UnusedAppsScreen(
@@ -80,6 +86,7 @@ fun UnusedAppsScreen(
     val colors = Sweep.colors
     val context = LocalContext.current
     val apps = state.apps
+    val threshold = state.settings.unusedAppThresholdDays
 
     val uninstallLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -94,7 +101,8 @@ fun UnusedAppsScreen(
         SweepTopBar(
             title = "Unused apps",
             subtitle = apps?.takeIf { it.hasUsageAccess }?.let {
-                "${it.unused.size} unused · ${ByteFormat.short(it.reclaimableBytes)}"
+                if (it.unused.isEmpty()) "Nothing confirmed unused"
+                else "${it.unused.size} unused · ${ByteFormat.short(it.reclaimableBytes)}"
             },
             onBack = onBack,
         )
@@ -131,10 +139,7 @@ fun UnusedAppsScreen(
             return@Column
         }
 
-        ThresholdRow(
-            selected = state.settings.unusedAppThresholdDays,
-            onSelect = onThresholdChange,
-        )
+        ThresholdRow(selected = threshold, onSelect = onThresholdChange)
 
         if (state.appsLoading && apps == null) {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -143,34 +148,84 @@ fun UnusedAppsScreen(
             return@Column
         }
 
-        if (apps == null || apps.unused.isEmpty()) {
+        if (apps == null || (apps.unused.isEmpty() && apps.unknownUsage.isEmpty())) {
             EmptyState(
                 title = "All in use.",
-                body = "Nothing has been sitting untouched for " +
-                    "${state.settings.unusedAppThresholdDays} days or more.",
+                body = "Nothing has been sitting untouched for $threshold days or more.",
             )
             return@Column
         }
 
         LazyColumn(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 14.dp, end = 14.dp, top = 8.dp, bottom = 40.dp,
-            ),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 40.dp),
             verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            items(apps.unused, key = { it.app.packageName }) { unused ->
-                AppRow(
-                    unused = unused,
-                    loadIcon = loadIcon,
-                    onUninstall = {
-                        uninstallLauncher.launch(
-                            SystemFlows.uninstallIntent(unused.app.packageName)
-                        )
-                    },
-                    onExclude = { onExcludeApp(unused.app.packageName) },
-                    modifier = Modifier.animateItem(),
-                )
+            if (apps.unused.isNotEmpty()) {
+                item {
+                    SectionLabel(
+                        text = "Not opened in $threshold+ days",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                    )
+                }
+                items(apps.unused, key = { "unused:" + it.app.packageName }) { unused ->
+                    AppRow(
+                        app = unused.app,
+                        detail = "Last opened ${AgeFormat.describe(unused.daysSinceUse)}",
+                        loadIcon = loadIcon,
+                        actionText = "Uninstall",
+                        actionColor = colors.danger,
+                        onAction = {
+                            uninstallLauncher.launch(
+                                SystemFlows.uninstallIntent(unused.app.packageName)
+                            )
+                        },
+                        onExclude = { onExcludeApp(unused.app.packageName) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            } else if (apps.hasAnyUsageHistory) {
+                // Only true when Android actually reported some history. When it reported none,
+                // the note below is the honest explanation and this line would be vacuous.
+                item {
+                    Text(
+                        text = "Every app Android has a usage record for has been opened in the " +
+                            "last $threshold days.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textMute,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp),
+                    )
+                }
             }
+
+            if (apps.unknownUsage.isNotEmpty()) {
+                item {
+                    Spacer(Modifier.height(14.dp))
+                    UnknownUsageNote(
+                        count = apps.unknownUsage.size,
+                        everythingUnknown = !apps.hasAnyUsageHistory,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+                items(apps.unknownUsage, key = { "unknown:" + it.app.packageName }) { unknown ->
+                    AppRow(
+                        app = unknown.app,
+                        detail = "No usage on record · installed " +
+                            AgeFormat.describe(unknown.installedDays),
+                        loadIcon = loadIcon,
+                        actionText = "App info",
+                        actionColor = colors.textMute,
+                        onAction = {
+                            SystemFlows.launchFirstAvailable(
+                                context,
+                                listOf(SystemFlows.appDetailsIntent(unknown.app.packageName)),
+                            )
+                        },
+                        onExclude = { onExcludeApp(unknown.app.packageName) },
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
+
             item {
                 Spacer(Modifier.height(18.dp))
                 Text(
@@ -181,6 +236,56 @@ fun UnusedAppsScreen(
                     modifier = Modifier.padding(horizontal = 6.dp),
                 )
             }
+        }
+    }
+}
+
+/**
+ * States the limit plainly: no history is not evidence of disuse, so nothing here is counted or
+ * recommended. [everythingUnknown] covers the devices that return no usage data at all.
+ */
+@Composable
+private fun UnknownUsageNote(count: Int, everythingUnknown: Boolean) {
+    val colors = Sweep.colors
+    Column {
+        SectionLabel(
+            text = "Usage unknown",
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(colors.surface)
+                .border(1.dp, colors.line, MaterialTheme.shapes.medium)
+                .padding(14.dp),
+        ) {
+            Icon(
+                Icons.AutoMirrored.Outlined.HelpOutline,
+                contentDescription = null,
+                tint = colors.info,
+                modifier = Modifier.size(17.dp),
+            )
+            Spacer(Modifier.width(11.dp))
+            Text(
+                text = buildString {
+                    append(
+                        if (everythingUnknown) {
+                            "Android returned no usage history at all on this device, so Sweep " +
+                                "cannot tell when any app was last opened. "
+                        } else {
+                            "Android gave Sweep no last-opened date for " +
+                                (if (count == 1) "this app. " else "these $count apps. ")
+                        }
+                    )
+                    append(
+                        "That is not the same as unused — they may be opened daily. They are not " +
+                            "counted above and Sweep won't suggest removing them."
+                    )
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textMute,
+            )
         }
     }
 }
@@ -207,7 +312,7 @@ private fun ThresholdRow(selected: Int, onSelect: (Int) -> Unit) {
                             RoundedCornerShape(9.dp),
                         )
                         .pressable(onClick = { onSelect(days) })
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                        .padding(horizontal = 14.dp, vertical = 9.dp),
                 )
             }
         }
@@ -216,14 +321,16 @@ private fun ThresholdRow(selected: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun AppRow(
-    unused: UnusedApp,
+    app: InstalledApp,
+    detail: String,
     loadIcon: suspend (String) -> Drawable?,
-    onUninstall: () -> Unit,
+    actionText: String,
+    actionColor: Color,
+    onAction: () -> Unit,
     onExclude: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
-    val app = unused.app
     val shape = MaterialTheme.shapes.medium
 
     var icon by remember(app.packageName) { mutableStateOf<ImageBitmap?>(null) }
@@ -266,11 +373,7 @@ private fun AppRow(
             )
             Text(
                 text = buildString {
-                    append(
-                        unused.daysSinceUse
-                            ?.let { "Last opened ${AgeFormat.describe(it)}" }
-                            ?: "No usage on record"
-                    )
+                    append(detail)
                     if (app.totalBytes > 0) append(" · ${ByteFormat.short(app.totalBytes)}")
                 },
                 style = MaterialTheme.typography.bodySmall,
@@ -284,7 +387,7 @@ private fun AppRow(
 
         Box(
             modifier = Modifier
-                .size(36.dp)
+                .size(44.dp)
                 .clip(CircleShape)
                 .pressable(onClick = onExclude),
             contentAlignment = Alignment.Center,
@@ -297,7 +400,7 @@ private fun AppRow(
             )
         }
 
-        SweepTextButton(text = "Uninstall", onClick = onUninstall, color = colors.danger)
+        SweepTextButton(text = actionText, onClick = onAction, color = actionColor)
     }
 }
 

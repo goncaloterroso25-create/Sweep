@@ -83,10 +83,9 @@ only offered per-app cache navigation could avoid it; an "unused apps" feature c
 Settings → Special app access → Usage access. It cannot be requested with a runtime dialog. Data
 retention is roughly: daily buckets ~7 days, weekly ~4 weeks, monthly ~6 months, yearly ~2 years.
 
-**What Sweep currently does.** Checks the Usage Access grant and queries Android's usage statistics
-for installed apps. Physical-device testing has shown that last-opened information can be incomplete
-or inconsistent, so the unused-app feature should currently be treated as experimental rather than
-a reliable source of truth.
+**What Sweep does.** Checks the grant via `AppOpsManager.unsafeCheckOpNoThrow(OPSTR_GET_USAGE_STATS)`
+(with `MODE_DEFAULT` falling back to a permission check), and queries
+`queryAndAggregateUsageStats()` over a 730-day window. `lastTimeVisible` is folded in on API 29+.
 
 **The honesty point.** Because retention is finite, an app with no entry has not necessarily never
 been opened — it may simply not have been opened *recently enough to still be on record*. Sweep
@@ -121,15 +120,17 @@ checks afterwards whether the app is really gone."_
 app's cache. `PackageManager.deleteApplicationCacheFiles()` is `@hide` and system-only.
 `freeStorageAndNotify()` requires the privileged `CLEAR_APP_CACHE` permission.
 
-**What Sweep currently does:**
+**What Sweep does — all four of these are real:**
 
-1. Reads per-app `cacheBytes` via `StorageStatsManager` when Usage Access is available.
-2. Opens a specific app's storage page via `ACTION_APPLICATION_DETAILS_SETTINGS`, where the user
-   can clear that app's cache manually.
-3. Includes a bulk Android cache-management shortcut, but this shortcut has not worked reliably
-   during current physical-device testing and may be removed.
+1. Reads per-app `cacheBytes` via `StorageStatsManager` (needs Usage Access) so you can see where
+   the space is.
+2. On Android 12+ (API 31), opens `StorageManager.ACTION_CLEAR_APP_CACHE` — a genuine system
+   dialog that clears cached data across all apps. **Android** performs and confirms the work.
+3. Opens a specific app's storage page via `ACTION_APPLICATION_DETAILS_SETTINGS`.
+4. Clears its own cache — the only cache it owns — and shows the figure alongside the others
+   precisely so the difference between "Sweep did this" and "Android did this" stays visible.
 
-Sweep does not claim to clear another app's cache itself.
+Below API 31 there is no bulk system dialog, so Sweep opens storage settings and says why.
 
 At no point does Sweep report another app's cache as space *it* recovered.
 

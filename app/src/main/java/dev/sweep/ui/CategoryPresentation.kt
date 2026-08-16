@@ -84,7 +84,6 @@ fun reasonLabel(reason: Reason, category: CleanupCategory? = null): String = whe
     Reason.ExtractedFolderPresent -> "Already extracted here"
     Reason.Screenshot -> "Screenshot"
     Reason.EmptyFolder -> "Empty folder"
-    Reason.NoUsageRecord -> "No usage on record"
 }
 
 /** The size chip is rendered separately in most rows, so it is filtered out of the chip list. */

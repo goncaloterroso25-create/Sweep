@@ -94,9 +94,12 @@ fun CompletionScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
+                    // Same wording and weight as Home, because it is the same fact and the user
+                    // has just watched it change.
                     text = "${ByteFormat.short(storage.freeBytes)} free of " +
-                        ByteFormat.short(storage.totalBytes),
-                    style = MaterialTheme.typography.bodyMedium,
+                        "${ByteFormat.short(storage.totalBytes)} · " +
+                        "${ByteFormat.short(storage.usedBytes)} used",
+                    style = MaterialTheme.typography.titleSmall,
                     color = colors.textMute,
                 )
             }

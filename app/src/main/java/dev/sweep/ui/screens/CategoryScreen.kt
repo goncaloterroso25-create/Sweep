@@ -39,6 +39,7 @@ import dev.sweep.core.model.CleanupItem
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.blurb
 import dev.sweep.ui.components.EmptyState
+import dev.sweep.ui.components.FileDetailsSheet
 import dev.sweep.ui.components.FileRow
 import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.SweepTextButton
@@ -77,6 +78,9 @@ fun CategoryScreen(
     val colors = Sweep.colors
     var sort by remember { mutableStateOf(SortOrder.LARGEST) }
     var sortMenu by remember { mutableStateOf(false) }
+    // The item whose details sheet is open. Held here rather than per row so it survives the row
+    // being recycled or reordered underneath it.
+    var previewing by remember { mutableStateOf<CleanupItem?>(null) }
 
     val items = state.itemsIn(category)
     val sorted = remember(items, sort) {
@@ -116,6 +120,12 @@ fun CategoryScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textMute,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+            )
+            Text(
+                text = "Tap a row to see what it is. The checkbox marks it for deletion.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textFaint,
+                modifier = Modifier.padding(horizontal = 20.dp),
             )
 
             Spacer(Modifier.height(12.dp))
@@ -223,6 +233,7 @@ fun CategoryScreen(
                             haptics.select()
                             onToggle(item.path)
                         },
+                        onOpen = { previewing = item },
                         onExclude = {
                             haptics.tick()
                             onExclude(item)
@@ -232,5 +243,22 @@ fun CategoryScreen(
                 }
             }
         }
+    }
+
+    previewing?.let { item ->
+        FileDetailsSheet(
+            item = item,
+            selected = item.path in state.selectedPaths,
+            onToggleSelected = {
+                haptics.select()
+                onToggle(item.path)
+            },
+            onExclude = {
+                haptics.tick()
+                previewing = null
+                onExclude(item)
+            },
+            onDismiss = { previewing = null },
+        )
     }
 }

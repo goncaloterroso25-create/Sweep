@@ -98,10 +98,9 @@ fun SweepAppRoot(viewModel: SweepViewModel) {
                     count = state.selectedCount,
                     bytes = state.selectedBytes,
                     onClear = { viewModel.clearSelection() },
-                    onClean = {
-                        haptics.select()
-                        confirming = true
-                    },
+                    // No haptic here: this opens the confirmation sheet, it does not confirm
+                    // anything. The tick belongs on the button that actually deletes.
+                    onClean = { confirming = true },
                 )
             }
 
@@ -185,15 +184,11 @@ private fun SweepNavHost(
         composable(Routes.HOME) {
             HomeScreen(
                 state = state,
-                onScan = {
-                    haptics.select()
-                    viewModel.startScan()
-                },
+                // Starting a scan is not a selection or a confirmation, so it gets no haptic.
+                // Rationing them is what keeps the four that remain meaningful.
+                onScan = viewModel::startScan,
                 onCancelScan = { viewModel.cancelScan() },
-                onRescan = {
-                    haptics.select()
-                    viewModel.startScan()
-                },
+                onRescan = viewModel::startScan,
                 onOpenCategory = { navController.navigate(Routes.category(it)) },
                 onOpenApps = {
                     viewModel.loadApps()
@@ -255,6 +250,7 @@ private fun SweepNavHost(
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 state = state,
+                haptics = haptics,
                 onBack = { navController.popBackStack() },
                 onOldFileThreshold = viewModel::setOldFileThreshold,
                 onLargeFileThreshold = viewModel::setLargeFileThreshold,

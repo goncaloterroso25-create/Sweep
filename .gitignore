@@ -1,29 +1,18 @@
-# Android Studio / IntelliJ
-.idea/
 *.iml
-
-# Gradle / Kotlin generated state
 .gradle/
-.kotlin/
-**/build/
-
-# Machine-local Android SDK configuration
+/local.properties
+/.idea/
+.DS_Store
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
 local.properties
-
-# Native build output
-.externalNativeBuild/
-.cxx/
-
-# Captures and generated release artifacts
-captures/
-app/release/
 *.apk
 *.aab
+/app/release/
 
-# Signing material
-*.jks
-*.keystore
-
-# OS files
-.DS_Store
-Thumbs.db
+# Local Claude Code / Kotlin tooling
+.claude/
+.kotlin/

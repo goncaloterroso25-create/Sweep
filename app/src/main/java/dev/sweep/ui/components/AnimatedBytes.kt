@@ -37,6 +37,8 @@ fun AnimatedBytes(
     valueColor: Color = Sweep.colors.text,
     unitColor: Color = Sweep.colors.textMute,
     animate: Boolean = true,
+    /** Word set after the unit, e.g. "free". Keeps the figure's meaning attached to the figure. */
+    suffix: String? = null,
 ) {
     val reduced = LocalReducedMotion.current
     val animated = remember { Animatable(bytes.toFloat()) }
@@ -53,7 +55,7 @@ fun AnimatedBytes(
     }
 
     val shown = ByteFormat.format(animated.value.toLong().coerceAtLeast(0L))
-    val spoken = ByteFormat.short(bytes)
+    val spoken = ByteFormat.short(bytes) + (suffix?.let { " $it" } ?: "")
 
     Row(modifier = modifier.semantics { contentDescription = spoken }) {
         Text(
@@ -64,10 +66,32 @@ fun AnimatedBytes(
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = shown.unit,
+            text = if (suffix == null) shown.unit else "${shown.unit} $suffix",
             style = unitStyle,
             color = unitColor,
             modifier = Modifier.alignByBaseline(),
         )
     }
+}
+
+/** Same idea for plain counts: "128 files". */
+@Composable
+fun AnimatedCount(
+    count: Int,
+    modifier: Modifier = Modifier,
+    style: TextStyle = MaterialTheme.typography.displaySmall,
+    color: Color = Sweep.colors.text,
+) {
+    val reduced = LocalReducedMotion.current
+    val animated = remember { Animatable(count.toFloat()) }
+    LaunchedEffect(count, reduced) {
+        if (reduced) animated.snapTo(count.toFloat())
+        else animated.animateTo(count.toFloat(), tween(460, easing = SweepMotion.Emphasized))
+    }
+    Text(
+        text = animated.value.toInt().coerceAtLeast(0).toString(),
+        style = style,
+        color = color,
+        modifier = modifier,
+    )
 }
