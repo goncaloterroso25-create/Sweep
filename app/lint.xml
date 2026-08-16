@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!--
+      Lint suggests merging res/mipmap-anydpi-v26 into res/mipmap-anydpi because minSdk is
+      already 26. Doing that makes AAPT2 fail to resolve @mipmap/ic_launcher at all, so the
+      version qualifier stays. Verified by building both ways.
+    -->
+    <issue id="ObsoleteSdkInt">
+        <ignore path="src/main/res/mipmap-anydpi-v26" />
+    </issue>
+
+    <!--
+      Dependency freshness is a maintenance decision for this project, not a build failure.
+      Versions are pinned in gradle/libs.versions.toml and bumped deliberately.
+    -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+
+    <!--
+      The Navigation artifacts ship lint checks compiled against an older lint API than
+      AGP 8.7 runs. Nothing Sweep can fix; it is noise until those artifacts are rebuilt.
+    -->
+    <issue id="ObsoleteLintCustomCheck" severity="ignore" />
+</lint>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Compose draws everything; this theme exists only so the window that appears before the
+      first frame is already the right colour, and so the system bars are transparent for the
+      edge-to-edge layout.
+    -->
+    <style name="Theme.Sweep" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/sweep_base</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

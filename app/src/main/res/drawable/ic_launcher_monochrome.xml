@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon variant: same mark, single colour, tinted by the launcher. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
+
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-14">
+
+        <path
+            android:pathData="M34.5,44.5 L71.5,44.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M46.5,57.5 L71.5,57.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M58.5,70.5 L71.5,70.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M34.2,70.5 L35.0,70.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeAlpha="0.45"
+            android:strokeWidth="9"
+            android:strokeLineCap="round" />
+    </group>
+</vector>
