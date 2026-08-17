@@ -58,6 +58,8 @@ data class SweepUiState(
     val result: ScanResult? = null,
     val apps: AppScanResult? = null,
     val appsLoading: Boolean = false,
+    /** One short line about the last uninstall attempt. Only ever set from a verified outcome. */
+    val appNotice: String? = null,
     val selectedPaths: Set<String> = emptySet(),
     val deleteProgress: Float = 0f,
     val cleanup: CleanupSummary? = null,
@@ -297,12 +299,37 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun appIcon(packageName: String) = repository.appInventory.icon(packageName)
 
-    /** Called when returning from the system uninstall dialog; verifies what actually happened. */
-    fun verifyUninstall() {
+    /**
+     * Called when the system uninstall dialog returns.
+     *
+     * Nothing here trusts the dialog's word. The package list is re-read and the package is asked
+     * for directly, so Sweep only says an app is gone when Android agrees it is gone. A failure is
+     * reported as a failure, and a cancelled dialog says nothing at all.
+     */
+    fun onUninstallReturned(packageName: String, label: String, resultCode: Int) {
         _state.update { it.copy(appsLoading = true) }
-        viewModelScope.launch { reloadApps() }
+        viewModelScope.launch {
+            reloadApps()
+            val stillInstalled = withContext(Dispatchers.IO) { repository.isInstalled(packageName) }
+            _state.update {
+                it.copy(
+                    appNotice = when {
+                        !stillInstalled -> "$label was removed."
+                        resultCode == UNINSTALL_FAILED -> "Android could not remove $label."
+                        else -> null
+                    }
+                )
+            }
+        }
         refreshEnvironment()
     }
+
+    /** No uninstall screen answered the intent, which some locked-down builds do. */
+    fun reportUninstallUnavailable(label: String) = _state.update {
+        it.copy(appNotice = "This device would not open an uninstall screen for $label.")
+    }
+
+    fun dismissAppNotice() = _state.update { it.copy(appNotice = null) }
 
     // ---- cleanup ----------------------------------------------------------------------------
 
@@ -389,4 +416,9 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun completeOnboarding() = viewModelScope.launch { settingsStore.setOnboardingComplete() }
+
+    private companion object {
+        /** `Activity.RESULT_FIRST_USER`, which ACTION_UNINSTALL_PACKAGE uses to mean "failed". */
+        const val UNINSTALL_FAILED = 1
+    }
 }

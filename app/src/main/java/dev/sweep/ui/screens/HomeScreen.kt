@@ -1,6 +1,11 @@
 package dev.sweep.ui.screens
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -30,12 +35,19 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.sweep.core.android.SweepPermissions
 import dev.sweep.core.android.SystemFlows
@@ -45,18 +57,20 @@ import dev.sweep.core.model.ScanPhase
 import dev.sweep.ui.Stage
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.AnimatedBytes
-import dev.sweep.ui.components.AppearIn
 import dev.sweep.ui.components.ButtonTone
 import dev.sweep.ui.components.CategoryCard
 import dev.sweep.ui.components.EmptyState
 import dev.sweep.ui.components.NoticeCard
+import dev.sweep.ui.components.RevealIn
 import dev.sweep.ui.components.SectionLabel
 import dev.sweep.ui.components.StorageMeter
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
+import dev.sweep.ui.components.SweepWordmark
 import dev.sweep.ui.components.UtilityCard
 import dev.sweep.ui.components.pressable
-import dev.sweep.ui.theme.Grotesk
+import dev.sweep.ui.components.rememberSweepPhase
+import dev.sweep.ui.components.sweepGlow
 import dev.sweep.ui.theme.Sweep
 import dev.sweep.ui.theme.sweepTween
 import java.io.File
@@ -93,14 +107,17 @@ fun HomeScreen(
             .statusBarsPadding()
             .padding(horizontal = 20.dp),
     ) {
+        val scanning = state.stage == Stage.SCANNING
+        // One clock for the front, shared by the field and the light behind it, and only alive
+        // while a scan is running.
+        val phase = rememberSweepPhase(active = scanning)
+        // The mark acknowledges a scan starting, once, by redrawing its bars.
+        var scanCount by remember { mutableIntStateOf(0) }
+        LaunchedEffect(scanning) { if (scanning) scanCount++ }
+
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Sweep",
-                style = MaterialTheme.typography.headlineMedium.copy(fontFamily = Grotesk),
-                color = colors.text,
-                modifier = Modifier.weight(1f),
-            )
+            SweepWordmark(modifier = Modifier.weight(1f), pulseKey = scanCount)
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -117,18 +134,21 @@ fun HomeScreen(
             }
         }
 
-        Spacer(Modifier.height(28.dp))
-        FreeSpaceHero(state)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(26.dp))
 
-        StorageMeter(
-            usedFraction = state.storage.usedFraction,
-            reclaimFraction = meterReclaimFraction(state),
-            scanning = state.stage == Stage.SCANNING,
-            contentDescription = meterDescription(state),
-        )
-        Spacer(Modifier.height(12.dp))
-        MeterLegend(state)
+        // Hero and field share one surface so the light behind the front reaches both.
+        Column(Modifier.sweepGlow(phase = phase, active = scanning)) {
+            FreeSpaceHero(state)
+            Spacer(Modifier.height(20.dp))
+            StorageMeter(
+                usedFraction = state.storage.usedFraction,
+                reclaimFraction = meterReclaimFraction(state),
+                scanPhase = phase.takeIf { scanning },
+                contentDescription = meterDescription(state),
+            )
+            Spacer(Modifier.height(12.dp))
+            MeterLegend(state)
+        }
 
         Spacer(Modifier.height(20.dp))
         ScanPanel(
@@ -143,7 +163,7 @@ fun HomeScreen(
             NoticeCard(
                 title = "See what can go",
                 body = "Sweep needs file access to find old downloads, duplicates and installers. " +
-                    "Everything stays on your device — there is no account and no network.",
+                    "Everything stays on your device. There is no account and no network.",
                 icon = Icons.Outlined.Lock,
                 tint = colors.accent,
                 action = {
@@ -177,8 +197,10 @@ fun HomeScreen(
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 live.forEachIndexed { index, summary ->
                     // Keyed so a category keeps its identity as the scan reshuffles the list.
+                    // That is also what stops a card re-animating every time its count ticks up:
+                    // the reveal runs once, when the category is first discovered.
                     androidx.compose.runtime.key(summary.category) {
-                        AppearIn(index = index) {
+                        RevealIn(index = index) {
                             CategoryCard(
                                 summary = summary,
                                 onClick = { onOpenCategory(summary.category) },
@@ -192,9 +214,9 @@ fun HomeScreen(
         if (showEmptyState) {
             Spacer(Modifier.height(16.dp))
             EmptyState(
-                title = "You're clear.",
-                body = "Nothing obvious is wasting space. Sweep looked through " +
-                    "${state.result?.filesScanned.orZero().formatted()} files.",
+                title = "Nothing obvious to clear",
+                body = "Sweep looked through ${state.result?.filesScanned.orZero().formatted()} " +
+                    "files and found nothing worth removing.",
             )
         }
 
@@ -318,9 +340,32 @@ private fun ScanPanel(
 ) {
     val colors = Sweep.colors
 
-    Box(Modifier.animateContentSize(animationSpec = sweepTween(260))) {
-        when (state.stage) {
-            Stage.SCANNING -> {
+    // Scanning, results and the idle action are three phases of one panel, so they cross-dissolve
+    // in place instead of the screen swapping one block for another. Grouped so that cleaning and
+    // completing do not re-run the transition.
+    val phase = when (state.stage) {
+        Stage.SCANNING -> ScanPanelPhase.SCANNING
+        Stage.RESULTS, Stage.CLEANING, Stage.DONE -> ScanPanelPhase.RESULTS
+        else -> ScanPanelPhase.IDLE
+    }
+
+    // Hoisted: transitionSpec is not a composable scope, so the specs are built out here.
+    val arriveFade = sweepTween<Float>(240, delayMillis = 90)
+    val arriveSlide = sweepTween<IntOffset>(320, delayMillis = 90)
+    val leaveFade = sweepTween<Float>(140)
+    val resize = sweepTween<IntSize>(260)
+
+    AnimatedContent(
+        targetState = phase,
+        transitionSpec = {
+            (fadeIn(arriveFade) + slideInHorizontally(arriveSlide) { it / 12 })
+                .togetherWith(fadeOut(leaveFade))
+        },
+        modifier = Modifier.animateContentSize(animationSpec = resize),
+        label = "scanPanel",
+    ) { current ->
+        when (current) {
+            ScanPanelPhase.SCANNING -> {
                 val progress = state.progress
                 val found = progress?.partial?.sumOf { it.totalBytes } ?: 0L
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -353,7 +398,7 @@ private fun ScanPanel(
                 }
             }
 
-            Stage.RESULTS, Stage.CLEANING, Stage.DONE -> {
+            ScanPanelPhase.RESULTS -> {
                 val result = state.result
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     // With no findings the empty state below says everything worth saying, so
@@ -388,7 +433,7 @@ private fun ScanPanel(
                 }
             }
 
-            else -> {
+            ScanPanelPhase.IDLE -> {
                 SweepButton(
                     text = "Scan storage",
                     onClick = onScan,
@@ -399,6 +444,8 @@ private fun ScanPanel(
         }
     }
 }
+
+private enum class ScanPanelPhase { IDLE, SCANNING, RESULTS }
 
 /**
  * Where the walk currently is, when that is something worth saying. During hashing there is no
@@ -423,7 +470,11 @@ private fun meterReclaimFraction(state: SweepUiState): Float {
         // reports. Afterwards they track the live selection, so choosing more files visibly
         // grows the space that is about to come back. The legend names whichever is in play.
         Stage.SCANNING -> state.progress?.partial?.sumOf { it.totalBytes } ?: 0L
-        Stage.RESULTS, Stage.CLEANING, Stage.DONE -> state.selectedBytes
+        // Deleting drains the accent region as the files actually go. This follows real progress
+        // through the selection, not a guess at the outcome: the free-space figure above only
+        // moves once Android has been asked again.
+        Stage.CLEANING -> (state.selectedBytes * (1f - state.deleteProgress)).toLong()
+        Stage.RESULTS, Stage.DONE -> state.selectedBytes
         else -> 0L
     }
     return (bytes.toFloat() / total).coerceIn(0f, 1f)
@@ -453,7 +504,7 @@ private fun appsSubtitle(state: SweepUiState): String {
 private fun cacheSubtitle(state: SweepUiState): String = when {
     !state.permissions.hasUsageAccess -> "Needs Usage Access to measure cached data"
     state.apps == null -> "See what apps are caching"
-    else -> "Sweep shows the sizes — Android does the clearing"
+    else -> "Sweep shows the sizes, Android does the clearing"
 }
 
 private fun Int?.orZero(): Int = this ?: 0

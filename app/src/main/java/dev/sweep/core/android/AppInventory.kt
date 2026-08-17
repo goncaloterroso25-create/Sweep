@@ -1,21 +1,18 @@
 package dev.sweep.core.android
 
 import android.app.usage.StorageStatsManager
-import android.app.usage.UsageStats
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.os.Build
 import android.os.Process
 import android.util.LruCache
 import dev.sweep.core.model.AppScanResult
 import dev.sweep.core.model.InstalledApp
+import dev.sweep.core.model.UsageRecord
 import dev.sweep.core.scan.UnusedAppPolicy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
 
 /**
  * Reads the installed-app inventory and, when Usage Access is granted, how long each app has
@@ -24,9 +21,9 @@ import java.util.concurrent.TimeUnit
  * Two Android limits shape this and are surfaced honestly in the UI:
  *  - Package visibility (Android 11+) means the list is only complete because Sweep declares
  *    QUERY_ALL_PACKAGES. Without it Android would hide most of the device's apps.
- *  - Usage history is retained for roughly two years, and some devices return nothing at all for
- *    an app even with Usage Access granted. A missing timestamp therefore means "unknown", never
- *    "never opened" and never "unused" — see [UnusedAppPolicy].
+ *  - Usage history is uneven. [UsageHistory] explains what Sweep does about that; what matters
+ *    here is that a missing timestamp means unknown, never "never opened" and never "unused".
+ *    See [UnusedAppPolicy].
  */
 class AppInventory(private val context: Context) {
 
@@ -39,7 +36,7 @@ class AppInventory(private val context: Context) {
         now: Long = System.currentTimeMillis(),
     ): AppScanResult = withContext(Dispatchers.IO) {
         val hasUsageAccess = SweepPermissions.hasUsageAccess(context)
-        val usage = if (hasUsageAccess) readUsage(now) else emptyMap()
+        val usage = if (hasUsageAccess) UsageHistory.read(context, now).records else emptyMap()
         val storageStats = if (hasUsageAccess) {
             context.getSystemService(Context.STORAGE_STATS_SERVICE) as? StorageStatsManager
         } else {
@@ -66,7 +63,7 @@ class AppInventory(private val context: Context) {
 
     private fun toInstalledApp(
         info: ApplicationInfo,
-        usage: Map<String, UsageStats>,
+        usage: Map<String, UsageRecord>,
         stats: StorageStatsManager?,
     ): InstalledApp {
         val pkg = info.packageName
@@ -74,14 +71,7 @@ class AppInventory(private val context: Context) {
             packageManager.getPackageInfo(pkg, 0).firstInstallTime
         }.getOrDefault(0L)
 
-        val lastUsed = usage[pkg]?.let { entry ->
-            val visible = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                entry.lastTimeVisible
-            } else {
-                0L
-            }
-            maxOf(entry.lastTimeUsed, visible).takeIf { it > 0L }
-        }
+        val lastUsed = usage[pkg]?.lastUsedAt
 
         val sizes = stats?.runCatching {
             queryStatsForPackage(info.storageUuid, pkg, Process.myUserHandle())
@@ -102,14 +92,6 @@ class AppInventory(private val context: Context) {
         )
     }
 
-    private fun readUsage(now: Long): Map<String, UsageStats> {
-        val manager = context.getSystemService(Context.USAGE_STATS_SERVICE) as? UsageStatsManager
-            ?: return emptyMap()
-        val begin = now - TimeUnit.DAYS.toMillis(USAGE_HISTORY_DAYS)
-        return runCatching { manager.queryAndAggregateUsageStats(begin, now) }
-            .getOrDefault(emptyMap())
-    }
-
     @Suppress("DEPRECATION")
     private fun installedApplications(): List<ApplicationInfo> =
         runCatching { packageManager.getInstalledApplications(0) }.getOrDefault(emptyList())
@@ -125,10 +107,5 @@ class AppInventory(private val context: Context) {
                 .getOrNull()
                 ?.also { iconCache.put(packageName, it) }
         }
-    }
-
-    private companion object {
-        /** Android keeps roughly two years of aggregated usage. Asking for more gains nothing. */
-        const val USAGE_HISTORY_DAYS = 730L
     }
 }

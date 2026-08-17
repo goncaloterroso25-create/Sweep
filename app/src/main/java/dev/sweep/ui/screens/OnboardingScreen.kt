@@ -121,8 +121,8 @@ fun OnboardingScreen(
             PermissionBlock(
                 icon = Icons.Outlined.Schedule,
                 title = "Find apps you forgot",
-                body = "Usage Access lets Sweep tell when your apps were last opened. Sweep " +
-                    "doesn't upload this data — there is nowhere for it to go.",
+                body = "Usage Access lets Sweep see when your apps were last opened. The data " +
+                    "stays on the device.",
                 granted = permissions.hasUsageAccess,
                 grantedLabel = "Usage Access granted",
                 buttonLabel = "Allow Usage Access",

@@ -47,6 +47,9 @@ class SweepRepository(private val context: Context) {
     suspend fun loadApps(thresholdDays: Int, excludedPackages: Set<String>): AppScanResult =
         appInventory.load(thresholdDays, excludedPackages)
 
+    /** The only thing that settles whether an uninstall worked. Asked after the dialog returns. */
+    fun isInstalled(packageName: String): Boolean = SystemFlows.isInstalled(context, packageName)
+
     /**
      * Deletes the selection and then tells MediaStore what disappeared, so the gallery does not
      * keep showing thumbnails for files that are gone.

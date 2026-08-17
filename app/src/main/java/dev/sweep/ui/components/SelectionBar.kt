@@ -3,6 +3,7 @@ package dev.sweep.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -20,9 +21,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.sweep.core.model.ByteFormat
 import dev.sweep.ui.theme.Sweep
 import dev.sweep.ui.theme.springGentle
+import dev.sweep.ui.theme.springSettle
 import dev.sweep.ui.theme.sweepTween
 
 /**
@@ -43,7 +44,12 @@ fun SelectionBar(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(animationSpec = springGentle()) { it } + fadeIn(sweepTween(180)),
+        // Rises from the edge it is anchored to and settles, rather than fading in on the spot.
+        // The scale is barely perceptible on its own, but it is what connects the bar to the tap
+        // that produced it.
+        enter = slideInVertically(animationSpec = springSettle()) { it } +
+            fadeIn(sweepTween(180)) +
+            scaleIn(initialScale = 0.96f, animationSpec = springSettle()),
         exit = slideOutVertically(animationSpec = springGentle()) { it } + fadeOut(sweepTween(140)),
         modifier = modifier,
     ) {
@@ -76,10 +82,14 @@ fun SelectionBar(
                             style = MaterialTheme.typography.titleSmall,
                             color = colors.textMute,
                         )
-                        Text(
-                            text = ByteFormat.short(bytes),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = colors.text,
+                        // Counts to its new value as files are picked, so the figure reads as
+                        // responding to the taps rather than replacing itself.
+                        AnimatedBytes(
+                            bytes = bytes,
+                            valueStyle = MaterialTheme.typography.headlineSmall,
+                            unitStyle = MaterialTheme.typography.titleSmall,
+                            valueColor = colors.text,
+                            unitColor = colors.textMute,
                         )
                     }
                     SweepTextButton(text = "Clear", onClick = onClear)
@@ -89,13 +99,5 @@ fun SelectionBar(
             }
             }
         }
-    }
-}
-
-/** Bottom-anchored container that keeps the bar clear of the gesture area. */
-@Composable
-fun BottomBarSlot(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.BottomCenter) {
-        content()
     }
 }

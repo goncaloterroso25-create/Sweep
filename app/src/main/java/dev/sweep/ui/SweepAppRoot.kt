@@ -75,6 +75,18 @@ fun SweepAppRoot(viewModel: SweepViewModel) {
         val haptics = rememberHaptics(state.settings.hapticsEnabled)
         var confirming by remember { mutableStateOf(false) }
 
+        // One tick when a scan resolves. Nothing during the scan itself: a buzz per discovery
+        // would turn a thirty-second scan into a pocket full of noise.
+        var wasScanning by remember { mutableStateOf(false) }
+        LaunchedEffect(state.stage) {
+            if (state.stage == Stage.SCANNING) {
+                wasScanning = true
+            } else if (wasScanning && state.stage == Stage.RESULTS) {
+                wasScanning = false
+                haptics.tick()
+            }
+        }
+
         val startDestination = remember {
             if (state.settings.onboardingComplete) Routes.HOME else Routes.ONBOARDING
         }
@@ -233,7 +245,9 @@ private fun SweepNavHost(
                 onBack = { navController.popBackStack() },
                 onThresholdChange = viewModel::setUnusedAppThreshold,
                 onExcludeApp = viewModel::excludeApp,
-                onUninstallReturned = { viewModel.verifyUninstall() },
+                onUninstallReturned = viewModel::onUninstallReturned,
+                onUninstallUnavailable = viewModel::reportUninstallUnavailable,
+                onDismissNotice = viewModel::dismissAppNotice,
             )
         }
 

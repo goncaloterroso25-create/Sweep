@@ -21,9 +21,29 @@ import android.provider.Settings
  */
 object SystemFlows {
 
-    /** The system uninstall confirmation. Result is verified with [isInstalled] on return. */
-    fun uninstallIntent(packageName: String): Intent =
-        Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName"))
+    /**
+     * The system uninstall confirmation, in order of preference.
+     *
+     * Sweep used to send only `ACTION_DELETE`. That is the older, looser action: some Settings
+     * implementations answer it, some ignore it, and on the phone where uninstall appeared to do
+     * nothing that is exactly what happened. `ACTION_UNINSTALL_PACKAGE` is the documented one, and
+     * it needs `REQUEST_DELETE_PACKAGES` in the manifest, which Sweep now declares. With
+     * `EXTRA_RETURN_RESULT` it also reports back whether the removal succeeded, was cancelled or
+     * failed, so Sweep can stop guessing.
+     *
+     * `ACTION_DELETE` stays as a fallback, and the app's own settings page as a last resort, since
+     * every device can at least open that.
+     */
+    @Suppress("DEPRECATION")
+    fun uninstallIntents(packageName: String): List<Intent> {
+        val target = Uri.parse("package:$packageName")
+        return listOf(
+            Intent(Intent.ACTION_UNINSTALL_PACKAGE, target)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, true),
+            Intent(Intent.ACTION_DELETE, target),
+            appDetailsIntent(packageName),
+        )
+    }
 
     fun appDetailsIntent(packageName: String): Intent =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))

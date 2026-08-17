@@ -89,7 +89,7 @@ fun CompletionScreen(
                 StorageMeter(
                     usedFraction = storage.usedFraction,
                     reclaimFraction = 0f,
-                    scanning = false,
+                    scanPhase = null,
                     contentDescription = "${ByteFormat.short(storage.freeBytes)} now free",
                 )
                 Spacer(Modifier.height(12.dp))

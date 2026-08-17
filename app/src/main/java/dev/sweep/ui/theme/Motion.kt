@@ -24,6 +24,19 @@ object SweepMotion {
     /** Sequential reveals: cards, rows, chips. */
     const val STAGGER_MS = 26
     const val MAX_STAGGERED_ITEMS = 12
+
+    /**
+     * Everything in Sweep that arrives, arrives from the same direction the scan front travels.
+     * Keeping one axis for the whole app is what makes discovering, selecting and clearing read
+     * as the same gesture rather than three unrelated effects.
+     */
+    val ENTER_SHIFT_DP = 10
+
+    /** How long the field takes to resolve once a scan stops. Short enough not to be a wait. */
+    const val RESOLVE_MS = 620
+
+    /** One pass of the scan front. Slow enough to read as deliberate, not a loading spinner. */
+    const val SWEEP_PERIOD_MS = 1900
 }
 
 val LocalReducedMotion = staticCompositionLocalOf { false }
@@ -42,6 +55,14 @@ fun <T> springGentle(): FiniteAnimationSpec<T> =
 @Composable
 fun <T> springBouncy(): FiniteAnimationSpec<T> =
     if (LocalReducedMotion.current) snap() else spring(dampingRatio = 0.52f, stiffness = 320f)
+
+/**
+ * Arrives quickly and stops without argument. Used where something takes its final position:
+ * a card landing after discovery, the field settling once a scan resolves.
+ */
+@Composable
+fun <T> springSettle(): FiniteAnimationSpec<T> =
+    if (LocalReducedMotion.current) snap() else spring(dampingRatio = 0.78f, stiffness = 400f)
 
 @Composable
 fun <T> sweepTween(

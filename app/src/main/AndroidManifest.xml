@@ -32,6 +32,14 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!--
+      Required since Android 8 to launch ACTION_UNINSTALL_PACKAGE. Without it the system may
+      quietly drop the request, which is why uninstall appeared to do nothing on one test device.
+      It does not let Sweep remove anything by itself: Android still shows its own confirmation
+      and performs the removal.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
     <application
         android:name=".SweepApplication"
         android:allowBackup="false"

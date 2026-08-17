@@ -1,5 +1,16 @@
 package dev.sweep.core.model
 
+/** Which Android source produced a package's last-used timestamp. */
+enum class UsageEvidence {
+    /** The user actually brought the app to the foreground. The strongest signal available. */
+    FOREGROUND_EVENT,
+
+    /** An aggregated usage bucket. Coarser, but it reaches much further back. */
+    INTERVAL_STATS,
+}
+
+data class UsageRecord(val lastUsedAt: Long, val evidence: UsageEvidence)
+
 /** A user-installed app plus whatever Android is willing to tell us about it. */
 data class InstalledApp(
     val packageName: String,

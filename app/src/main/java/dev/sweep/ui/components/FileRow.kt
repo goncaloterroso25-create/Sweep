@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -57,7 +58,8 @@ import dev.sweep.ui.icon
 import dev.sweep.ui.reasonLabel
 import dev.sweep.ui.theme.Sweep
 import dev.sweep.ui.theme.springBouncy
-import dev.sweep.ui.theme.springSnappy
+import dev.sweep.ui.theme.springGentle
+import dev.sweep.ui.theme.springSettle
 import dev.sweep.ui.visibleReasons
 import java.io.File
 
@@ -84,10 +86,19 @@ fun FileRow(
     var menuOpen by remember { mutableStateOf(false) }
     val interaction = remember { MutableInteractionSource() }
 
+    // The tint arrives a touch slower than the tick, so selecting reads as the row filling in
+    // behind the checkbox rather than the whole thing changing colour at once.
     val tint by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
-        animationSpec = springSnappy(),
+        animationSpec = springGentle(),
         label = "rowTint",
+    )
+    // A fraction of a percent of compression. Enough to feel deliberate under the finger, far too
+    // little to move neighbouring rows while someone is scanning down a list.
+    val settle by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = springSettle(),
+        label = "rowSettle",
     )
     val shape = MaterialTheme.shapes.medium
 
@@ -95,6 +106,11 @@ fun FileRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .graphicsLayer {
+                    val scale = 1f - settle * 0.008f
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .clip(shape)
                 .background(lerp(Color.Transparent, colors.accentSoft, tint))
                 .border(
@@ -165,7 +181,7 @@ fun FileRow(
 
             Spacer(Modifier.width(10.dp))
             Text(
-                text = if (item.isDirectory) "—" else ByteFormat.short(item.size),
+                text = if (item.isDirectory) "-" else ByteFormat.short(item.size),
                 style = MaterialTheme.typography.titleSmall,
                 color = colors.text,
             )
@@ -303,18 +319,4 @@ fun SelectionBox(selected: Boolean, modifier: Modifier = Modifier) {
             }
         }
     }
-}
-
-/** Small pill used for the "why" facts that do not fit on the summary line. */
-@Composable
-fun ReasonChip(text: String, modifier: Modifier = Modifier, tint: Color = Sweep.colors.textMute) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelMedium,
-        color = tint,
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(tint.copy(alpha = 0.10f))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
 }

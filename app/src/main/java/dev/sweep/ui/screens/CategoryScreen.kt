@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SwapVert
@@ -41,6 +41,7 @@ import dev.sweep.ui.blurb
 import dev.sweep.ui.components.EmptyState
 import dev.sweep.ui.components.FileDetailsSheet
 import dev.sweep.ui.components.FileRow
+import dev.sweep.ui.components.RevealIn
 import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.components.SweepTopBar
@@ -54,6 +55,9 @@ private enum class SortOrder(val label: String) {
     OLDEST("Oldest first"),
     NAME("Name"),
 }
+
+/** Roughly one screenful. Past this, rows appear immediately. */
+private const val ANIMATED_ROWS = 8
 
 /**
  * A category's contents, reviewable before anything is deleted.
@@ -108,7 +112,7 @@ fun CategoryScreen(
 
             if (items.isEmpty()) {
                 EmptyState(
-                    title = "Nothing here.",
+                    title = "Nothing here",
                     body = category.emptyLine,
                     accent = false,
                 )
@@ -207,7 +211,7 @@ fun CategoryScreen(
 
             if (safeCount == 0) {
                 Text(
-                    text = "Sweep pre-selects nothing here — decide these one by one.",
+                    text = "Nothing here is pre-selected. Decide these one by one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textFaint,
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -225,21 +229,27 @@ fun CategoryScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(7.dp),
             ) {
-                items(sorted, key = { it.path }) { item ->
-                    FileRow(
-                        item = item,
-                        selected = item.path in state.selectedPaths,
-                        onToggle = {
-                            haptics.select()
-                            onToggle(item.path)
-                        },
-                        onOpen = { previewing = item },
-                        onExclude = {
-                            haptics.tick()
-                            onExclude(item)
-                        },
-                        modifier = Modifier.animateItem(),
-                    )
+                itemsIndexed(sorted, key = { _, item -> item.path }) { index, item ->
+                    val row = @Composable {
+                        FileRow(
+                            item = item,
+                            selected = item.path in state.selectedPaths,
+                            onToggle = {
+                                haptics.select()
+                                onToggle(item.path)
+                            },
+                            onOpen = { previewing = item },
+                            onExclude = {
+                                haptics.tick()
+                                onExclude(item)
+                            },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                    // Only the rows that are on screen when the category opens get an entrance.
+                    // Staggering a list that can run to hundreds of files would cost scrolling
+                    // performance for an effect nobody would see past the first screenful.
+                    if (index < ANIMATED_ROWS) RevealIn(index = index) { row() } else row()
                 }
             }
         }

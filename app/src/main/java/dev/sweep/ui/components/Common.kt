@@ -245,5 +245,3 @@ fun HairLine(modifier: Modifier = Modifier) {
             .background(Sweep.colors.line.copy(alpha = 0.6f))
     )
 }
-
-val ScreenPadding = PaddingValues(horizontal = 20.dp)

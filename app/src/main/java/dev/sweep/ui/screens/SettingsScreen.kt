@@ -188,8 +188,8 @@ fun SettingsScreen(
             PermissionRow(
                 title = "File access",
                 granted = state.permissions.canScanFiles,
-                grantedText = "Granted — Sweep can scan shared storage",
-                deniedText = "Not granted — file scanning is unavailable",
+                grantedText = "Granted. Sweep can scan shared storage.",
+                deniedText = "Not granted. File scanning is unavailable.",
                 onOpen = {
                     SystemFlows.launchFirstAvailable(
                         context,
@@ -201,8 +201,8 @@ fun SettingsScreen(
             PermissionRow(
                 title = "Usage Access",
                 granted = state.permissions.hasUsageAccess,
-                grantedText = "Granted — Sweep can see last-opened dates and app sizes",
-                deniedText = "Not granted — unused apps and cache sizes are unavailable",
+                grantedText = "Granted. Sweep can see last-opened dates and app sizes.",
+                deniedText = "Not granted. Unused apps and cache sizes are unavailable.",
                 onOpen = {
                     SystemFlows.launchFirstAvailable(
                         context,
@@ -221,9 +221,8 @@ fun SettingsScreen(
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                text = "Everything Sweep does happens on this device. There is no account, no " +
-                    "server and no network permission — the app cannot send your file list " +
-                    "anywhere even if it wanted to.",
+                text = "Everything happens on this device. There is no account, no server and " +
+                    "no network permission, so your file list cannot leave the phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textMute,
             )
@@ -283,17 +282,15 @@ private fun HapticTestRow(haptics: SweepHaptics) {
             Text(
                 text = when {
                     !result.systemFeedbackEnabled ->
-                        "Android's touch feedback is switched off, so nothing will be felt. " +
-                            "Sweep's setting cannot override that."
+                        "Android's touch feedback is off, so nothing will be felt. Sweep's " +
+                            "setting cannot override that."
                     !result.accepted ->
-                        "Android declined the request — this device doesn't provide haptic " +
-                            "feedback for it."
+                        "Android declined the request. This device doesn't provide that haptic."
                     !result.appSettingEnabled ->
-                        "Android accepted it. Sweep's own haptics are currently off, so this " +
-                            "was the only buzz you'll get."
+                        "Android accepted it. Sweep's own haptics are off, so this was a one-off."
                     else ->
                         "Android accepted it. If you felt nothing, check vibration intensity in " +
-                            "your device's sound settings."
+                            "your sound settings."
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = if (result.systemFeedbackEnabled && result.accepted) {

@@ -106,10 +106,9 @@ fun CacheScreen(
             item {
                 NoticeCard(
                     title = "Android owns this one",
-                    body = "Sweep can measure how much each app has cached, and that is where its " +
-                        "power ends: Android does not let one app delete another app's cache, and " +
-                        "Sweep will never claim to have done it. Tap Manage on any app below to " +
-                        "open its storage page, where you can clear the cache yourself.",
+                    body = "Android does not let one app delete another app's cache. Sweep can " +
+                        "measure the sizes and open each app's storage page, where you clear it " +
+                        "yourself. Tap Manage on any app below.",
                     icon = Icons.Outlined.Cached,
                     tint = colors.categoryTint(dev.sweep.core.model.CleanupCategory.SCREENSHOTS),
                 )

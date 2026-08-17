@@ -73,25 +73,3 @@ fun AnimatedBytes(
         )
     }
 }
-
-/** Same idea for plain counts: "128 files". */
-@Composable
-fun AnimatedCount(
-    count: Int,
-    modifier: Modifier = Modifier,
-    style: TextStyle = MaterialTheme.typography.displaySmall,
-    color: Color = Sweep.colors.text,
-) {
-    val reduced = LocalReducedMotion.current
-    val animated = remember { Animatable(count.toFloat()) }
-    LaunchedEffect(count, reduced) {
-        if (reduced) animated.snapTo(count.toFloat())
-        else animated.animateTo(count.toFloat(), tween(460, easing = SweepMotion.Emphasized))
-    }
-    Text(
-        text = animated.value.toInt().coerceAtLeast(0).toString(),
-        style = style,
-        color = color,
-        modifier = modifier,
-    )
-}

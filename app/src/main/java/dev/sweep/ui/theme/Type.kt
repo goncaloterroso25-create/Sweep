@@ -2,19 +2,30 @@ package dev.sweep.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.sp
+import dev.sweep.R
 
 /**
- * Typography roles stay intentionally simple in the repository build.
+ * Two families with clearly separate jobs.
  *
- * Headings and numeric values use the system sans-serif family with stronger weight and tighter
- * tracking, while body copy uses the same family at calmer weights for readability.
+ * Space Grotesk carries every number and title: its figures are wide, slightly engineered and
+ * hold up at 60sp, which is what makes "42.8 GB" feel like the point of the screen. Inter does
+ * all of the reading — it disappears, which is exactly what body text should do.
  */
-val Grotesk = FontFamily.SansSerif
-val Inter = FontFamily.SansSerif
+val Grotesk = FontFamily(
+    Font(R.font.grotesk_medium, FontWeight.Medium),
+    Font(R.font.grotesk_bold, FontWeight.Bold),
+)
+
+val Inter = FontFamily(
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+)
 
 private val TrimBoth = LineHeightStyle(
     alignment = LineHeightStyle.Alignment.Center,
@@ -22,6 +33,7 @@ private val TrimBoth = LineHeightStyle(
 )
 
 val SweepTypography = Typography(
+    // Hero storage figure.
     displayLarge = TextStyle(
         fontFamily = Grotesk,
         fontWeight = FontWeight.Bold,
@@ -45,6 +57,7 @@ val SweepTypography = Typography(
         lineHeight = 32.sp,
         letterSpacing = (-0.7).sp,
     ),
+    // Screen titles.
     headlineMedium = TextStyle(
         fontFamily = Grotesk,
         fontWeight = FontWeight.Medium,
@@ -103,6 +116,7 @@ val SweepTypography = Typography(
         fontSize = 12.5.sp,
         lineHeight = 16.sp,
     ),
+    // Small uppercase eyebrows.
     labelSmall = TextStyle(
         fontFamily = Inter,
         fontWeight = FontWeight.SemiBold,
@@ -112,6 +126,7 @@ val SweepTypography = Typography(
     ),
 )
 
+/** Numerals inside a sentence still come from Grotesk, so figures never change texture. */
 val NumericStyle = TextStyle(
     fontFamily = Grotesk,
     fontWeight = FontWeight.Medium,

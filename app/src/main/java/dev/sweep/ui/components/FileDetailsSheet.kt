@@ -101,26 +101,35 @@ fun FileDetailsSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 20.dp),
         ) {
-            Preview(item)
+            // The thumbnail settles out of the size it had in the row, which is as close to a
+            // shared element as this is worth taking: no extra layout coordination, no chance of
+            // the sheet arriving before the image has anywhere to land.
+            ExpandIn { Preview(item) }
 
             Spacer(Modifier.height(16.dp))
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.headlineSmall,
-                color = colors.text,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            RevealIn(index = 0) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = colors.text,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             Spacer(Modifier.height(14.dp))
             HairLine()
             Spacer(Modifier.height(4.dp))
 
-            DetailRow("Folder", folderOf(item.path))
-            DetailRow("Size", if (item.isDirectory) "—" else ByteFormat.short(item.size))
-            DetailRow("Modified", DateFormat.day(item.lastModified))
+            RevealIn(index = 1) { DetailRow("Folder", folderOf(item.path)) }
+            RevealIn(index = 2) {
+                DetailRow("Size", if (item.isDirectory) "Folder" else ByteFormat.short(item.size))
+            }
+            RevealIn(index = 3) { DetailRow("Modified", DateFormat.day(item.lastModified)) }
             item.duplicate?.let {
-                DetailRow("Duplicate of", "${it.keeperName} · ${folderOf(it.keeperPath)}")
+                RevealIn(index = 4) {
+                    DetailRow("Duplicate of", "${it.keeperName} · ${folderOf(it.keeperPath)}")
+                }
             }
 
             Spacer(Modifier.height(6.dp))
@@ -287,4 +296,4 @@ private fun folderOf(path: String): String =
     File(path).parentFile?.absolutePath?.substringAfter("/storage/emulated/0/", "")
         ?.takeIf { it.isNotBlank() }
         ?: File(path).parent
-        ?: "—"
+        ?: "Unknown"
