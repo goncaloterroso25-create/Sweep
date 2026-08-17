@@ -63,6 +63,7 @@ import dev.sweep.core.scan.UnusedAppPolicy
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.EmptyState
 import dev.sweep.ui.components.NoticeCard
+import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.RevealIn
 import dev.sweep.ui.components.SectionLabel
 import dev.sweep.ui.components.SweepButton
@@ -93,6 +94,7 @@ fun UnusedAppsScreen(
     onUninstallReturned: (packageName: String, label: String, resultCode: Int) -> Unit,
     onUninstallUnavailable: (label: String) -> Unit,
     onDismissNotice: () -> Unit,
+    onUsageAccessRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
@@ -146,15 +148,15 @@ fun UnusedAppsScreen(
             Column(Modifier.padding(20.dp)) {
                 NoticeCard(
                     title = "Find apps you forgot",
-                    body = "Usage Access lets Sweep see when each app was last opened and how " +
-                        "much space it uses. It is granted in Android's settings, which Sweep " +
-                        "can open for you.",
+                    body = "Usage Access tells Sweep when each app was last opened, and how much " +
+                        "space it uses. Android grants it from its own settings screen.",
                     icon = Icons.Outlined.Schedule,
                     tint = colors.info,
                     action = {
                         SweepButton(
                             text = "Open Usage Access",
                             onClick = {
+                                onUsageAccessRequested()
                                 SystemFlows.launchFirstAvailable(
                                     context,
                                     SweepPermissions.usageAccessIntents(context),
@@ -163,9 +165,12 @@ fun UnusedAppsScreen(
                         )
                     },
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(6.dp))
+                RestrictedSettingsHelp(autoExpand = state.usageAccessRefused)
+                Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "Without it this screen stays empty. The rest of Sweep keeps working.",
+                    text = "Only this screen and app cache sizes need it. Everything else works " +
+                        "without it.",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textFaint,
                 )

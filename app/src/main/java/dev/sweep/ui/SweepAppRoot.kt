@@ -183,7 +183,9 @@ private fun SweepNavHost(
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 permissions = state.permissions,
+                usageAccessRefused = state.usageAccessRefused,
                 onPermissionsChanged = { viewModel.refreshEnvironment() },
+                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
                 onContinue = {
                     viewModel.completeOnboarding()
                     navController.navigate(Routes.HOME) {
@@ -248,6 +250,7 @@ private fun SweepNavHost(
                 onUninstallReturned = viewModel::onUninstallReturned,
                 onUninstallUnavailable = viewModel::reportUninstallUnavailable,
                 onDismissNotice = viewModel::dismissAppNotice,
+                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
             )
         }
 
@@ -258,6 +261,7 @@ private fun SweepNavHost(
                 onBack = { navController.popBackStack() },
                 onClearOwnCache = { viewModel.clearOwnCache() },
                 onRefreshOwnCache = { viewModel.refreshOwnCache() },
+                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
             )
         }
 
@@ -273,6 +277,7 @@ private fun SweepNavHost(
                 onHaptics = viewModel::setHaptics,
                 onMotion = viewModel::setMotion,
                 onClearExclusions = { viewModel.clearExclusions() },
+                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
             )
         }
     }

@@ -48,6 +48,7 @@ import dev.sweep.core.model.InstalledApp
 import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.ButtonTone
 import dev.sweep.ui.components.NoticeCard
+import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.SectionLabel
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
@@ -73,6 +74,7 @@ fun CacheScreen(
     onBack: () -> Unit,
     onClearOwnCache: () -> Unit,
     onRefreshOwnCache: () -> Unit,
+    onUsageAccessRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
@@ -159,6 +161,7 @@ fun CacheScreen(
                             SweepButton(
                                 text = "Open Usage Access",
                                 onClick = {
+                                    onUsageAccessRequested()
                                     SystemFlows.launchFirstAvailable(
                                         context,
                                         SweepPermissions.usageAccessIntents(context),
@@ -168,6 +171,7 @@ fun CacheScreen(
                         },
                     )
                 }
+                item { RestrictedSettingsHelp(autoExpand = state.usageAccessRefused) }
             } else if (cached.isEmpty()) {
                 item {
                     Spacer(Modifier.height(6.dp))
@@ -251,6 +255,6 @@ private fun CacheRow(
             style = MaterialTheme.typography.titleSmall,
             color = colors.text,
         )
-        SweepTextButton(text = "Manage", onClick = onManage)
+        SweepTextButton(text = "Manage cache", onClick = onManage)
     }
 }

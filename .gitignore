@@ -11,6 +11,17 @@
 local.properties
 *.apk
 *.aab
+
+# Release signing. None of this belongs in the repository.
+/keystore.properties
+*.jks
+*.keystore
 /app/release/
-.claude/
+
+# Claude Code worktrees and session data.
+/.claude/
 .kotlin/
+
+# One prebuilt debug APK is intentionally included for quick testing.
+!/apk/
+!/apk/Sweep-v0.4.0-debug.apk

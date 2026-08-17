@@ -1,196 +1,150 @@
 # Sweep
 
-An experimental Android storage cleanup app built as a personal portfolio project.
+An Android storage cleanup app built as a personal portfolio project.
 
-Sweep scans accessible device storage and helps identify files and apps that may be taking up unnecessary space.
+Sweep scans the storage it is allowed to see, groups what it finds into categories, and lets you review each file before anything is deleted. Everything happens on the device.
 
-This is currently an **early functional version**, not a production-ready application.
+This is a **functional personal project**, not a commercial release. It works, it has been used on real phones, and it is not on any app store.
 
-The project is being developed and tested locally before further UX, reliability and feature improvements.
-
----
-
-## Current status
-
-Sweep has been tested on **four physical Android devices**.
-
-Most of the core storage-scanning functionality is working, although some features still need improvement.
-
-### Working
-
-#### Storage scan
-
-The main storage scan works as intended.
-
-Sweep currently detects:
-
-- Large files
-- Duplicate files
-- Installed/downloaded APK files
-- Old downloads
-- Archives
-- Old screenshots
-- Empty folders
-- Potentially unused apps
-
-Files are grouped into categories so the user can review them before deleting anything.
-
-#### Duplicate files
-
-Duplicate files can be detected and presented for cleanup.
-
-The app keeps one copy instead of automatically selecting every duplicate for deletion.
-
-#### Cache information
-
-Sweep can display the amount of cache associated with installed applications.
-
-Android does not allow Sweep to directly clear another application's cache, so the app instead opens the relevant Android app-storage page where the user can clear it manually.
-
-This behavior works correctly.
-
-The old **Open Android Cache Management** button has been removed. It did not work reliably on either test device, and the per-app storage page already covers the same need.
-
-#### File preview
-
-Files can be inspected before they are deleted.
-
-Tapping a row opens a details sheet with a thumbnail for images and videos, plus the filename, folder, size and modified date. For duplicates it also names the copy that will be kept.
-
-From there, **Open** hands the file to whichever app the device already uses for that type, through a read-only permission granted for that one file. If nothing installed can open it, Sweep says so.
-
-Selecting and opening are separate actions. The checkbox marks a file for deletion, tapping the row inspects it.
-
-#### Haptic feedback
-
-Haptic feedback now works on the test devices.
-
-It is used sparingly: selecting a file, excluding one, confirming a deletion, finishing a scan and finishing a cleanup.
-
-The earlier problem was that `performHapticFeedback` is a request Android can silently ignore, and the return value was being discarded. Sweep now asks in a way the platform accepts and checks the result.
-
-Settings includes a **Test haptic** action that triggers the real confirmation feedback and reports what happened. Android's own touch-feedback setting still takes priority, and Sweep does not claim to override it.
-
-#### Unused apps
-
-An app is listed as unused only when Android reported a real last-opened date older than the chosen threshold. Nothing is inferred from install dates or package metadata.
-
-Sweep reads two sources and takes the newest date from either:
-
-- raw foreground events, which show exactly when the user last opened an app, but only cover recent history;
-- all four aggregated usage buckets, daily through yearly, which reach back much further.
-
-Earlier versions relied on `queryAndAggregateUsageStats` over a long history window. That produced very uneven results across devices. v0.3 now combines explicit usage-stat intervals with relevant foreground events and takes the newest plausible timestamp Android provides. This has improved usage-history coverage across the phones tested so far, but availability still varies by device.
-
-Testing so far does not indicate that Samsung's Sleeping or Deep Sleeping states are the cause of missing history. One device also returned dates from before Sweep was installed, confirming that Sweep is not limited to usage recorded after its own installation.
-
-**Usage unknown** is still a separate state, because some apps genuinely have no history. Those apps are excluded from the unused count and from the reclaimable total, and they get an app-info action instead of an uninstall button.
-
-#### Uninstalling
-
-Uninstalling opens Android's own confirmation dialog. Sweep never removes an app itself.
-
-This did not work on one test device. Sweep was sending the older `ACTION_DELETE` intent, which some Android builds ignore, and it lacked the `REQUEST_DELETE_PACKAGES` permission that `ACTION_UNINSTALL_PACKAGE` requires. Both are fixed, with fallbacks for devices that answer only the older action.
-
-Afterwards Sweep re-reads the package list and asks Android whether the package is still installed. It reports a removal only when the package is actually gone, reports a refusal when Android says the removal failed, and says nothing at all when the dialog was cancelled. The app list and storage figures refresh either way.
+Tested on **four physical Android devices**.
 
 ---
 
-## Known issues
+## Quick install APK
 
-### Usage history is uneven across devices
+If you only want to try Sweep, a prebuilt **v0.4.0 debug APK** is already included in the repository:
 
-Sweep now reads every usage source Android exposes, but it cannot create history that a device never recorded. Some apps will still show as Usage unknown, and how many depends on the device.
+`apk/Sweep-v0.4.0-debug.apk`
 
-This is a platform limitation rather than a bug, and the interface states it plainly instead of guessing.
+You can copy that file to an Android phone and install it directly. Because it is a manually installed debug build, Android, Play Protect or third-party antivirus software may show an unknown-app warning. The source is included in the same repository if you prefer to build it yourself.
 
----
-
-## Planned improvements
-
-### More device coverage
-
-Four phones is enough to find real problems and still not enough to call anything solved, particularly on older Android versions where the storage rules differ.
-
-### Malware scanning
-
-Potential future feature.
-
-This still needs research before deciding whether it belongs in Sweep and whether it can be implemented meaningfully without unnecessarily increasing the scope of the project.
+SHA-256: `9568c065c5f180e7ee08aac8f1ed4ce7183829d283bde0c08e49db885304f5e8`
 
 ---
 
-## Project goals
+## What it does
 
-Sweep is currently intended as a **small functional Android project for my GitHub portfolio**.
+| Feature | What it does | Status |
+| --- | --- | --- |
+| Storage scan | Walks accessible storage and groups cleanup candidates | Working |
+| Duplicate files | Finds byte-identical copies and always keeps one | Working |
+| Large files | Lists unusually large files for manual review | Working, never pre-selected |
+| Old downloads | Finds older files sitting in Downloads | Working |
+| Installers | Finds leftover APK and install files | Working |
+| Archives | Finds ZIP, RAR, 7z and similar archives | Working |
+| Old screenshots | Shows older screenshots for review | Working, never pre-selected |
+| Empty folders | Finds folders with nothing in them | Working |
+| File preview | Opens a file in an installed app before you delete it | Working |
+| Review and delete | Itemised confirmation, reports what actually got deleted | Working |
+| App cache | Shows cache sizes and opens each app's Android storage page | Working, Android does the clearing |
+| Unused apps | Uses Android's usage history to find apps you stopped opening | Device-dependent |
+| Uninstall | Opens Android's uninstall dialog, then verifies the result | Working |
+| Haptics | Short feedback on selection, confirmation and completion | Working |
 
-The priorities are:
-
-1. Real functionality
-2. Safe file deletion
-3. Clear information about what is being removed
-4. Fast and enjoyable UX
-5. Clean animations and transitions
-6. Honest handling of Android limitations
-
-The goal is not to create a commercial Android cleaner or pretend to perform operations that Android does not allow.
-
----
-
-## Interface
-
-The visual direction has not changed: near-black background, one lime accent, strong type, and a block field that represents the device's storage.
-
-What v0.3 added is motion with a consistent idea behind it. Things arrive along the same axis the scan front travels, so scanning, discovering, selecting and clearing feel like one gesture rather than separate effects:
-
-- during a scan a front moves through the block field, blocks respond as it passes and leave a short wake behind it, and a faint pool of light follows it;
-- categories reveal once as they are discovered, then update quietly instead of re-animating on every file;
-- when a scan ends the field resolves with a final pass rather than stopping;
-- selection tints the row and settles it by a fraction of a percent, and the toolbar rises from the edge with its figures counting up;
-- deleting drains the reclaimable blocks, and the free-space figure only moves once Android has been asked for the real number.
-
-The block field is a picture of activity and discovery, not a progress bar. The scanner cannot know how far through it is, so nothing pretends otherwise.
-
-The Home header now carries the Sweep mark next to the wordmark. It draws itself in once when the screen opens and once when a scan starts, and is otherwise still.
-
-Everything above respects the **Reduced motion** setting, which removes the sweep effects, stagger, spring overshoot and counting numbers while keeping state changes legible. Android's own animation setting is honoured too. No animation blocks an action, and nothing animates while the app is idle.
-
-Sweep has no sound effects, by choice.
+Unused apps is marked device-dependent on purpose. Sweep reads every usage source Android exposes, but some devices report very little history. Apps with no usable history are listed separately under **Usage unknown** rather than being guessed at.
 
 ---
 
-## Privacy
+## Running Sweep
 
-Sweep currently works locally on the device.
+You need [Android Studio](https://developer.android.com/studio) (Ladybug or newer) and **JDK 17**. Android Studio bundles a suitable JDK, so a separate install is usually unnecessary.
 
-File scanning and storage analysis do not require an account or cloud service.
+1. Clone or download the repository.
+2. Open the project **root folder** in Android Studio, not the `app` folder.
+3. Wait for the Gradle sync to finish. Studio will offer to install the Android SDK components it needs, including **SDK Platform 35**.
+4. Connect a phone by USB, or create an emulator in Device Manager.
+5. On a physical phone, enable **Developer options** by tapping Build number in Settings seven times, then turn on **USB debugging**.
+6. Pick the device in the toolbar dropdown.
+7. Run the `app` configuration.
+8. Grant the permissions Sweep asks for. Both are optional, and the app explains what is unavailable without them.
+
+A physical device is much better than an emulator here. Real storage, real installed apps, real usage history, real cache sizes and the actual uninstall flow are all things an emulator either fakes or does not have.
+
+**If Usage Access will not turn on:** Android restricts sensitive settings for apps installed manually rather than from a store, and the switch can appear greyed out or say the app was denied access. Open Sweep's App info, open the menu in the top right, choose **Allow restricted settings**, then try again. The wording varies between manufacturers. Sweep shows these steps in the app when it detects this.
 
 ---
 
-## Tech stack
+## Building a tester APK
 
-- Kotlin
-- Jetpack Compose
-- Material 3
-- Android Storage APIs
-- UsageStatsManager
-- StorageStatsManager
-- FileProvider, for file preview
-- Coroutines / Flow
-- DataStore
+**Debug build**, for your own development:
+
+```bash
+./gradlew assembleDebug
+```
+
+The APK is generated at `app/build/outputs/apk/debug/`. A prebuilt v0.4.0 debug APK is also included at `apk/Sweep-v0.4.0-debug.apk`. Debug builds install alongside a release build, since they use the `dev.sweep.debug` application ID.
+
+**Signed release build**, for sending to someone else. You need your own signing key.
+
+1. Create a key if you do not have one. In Android Studio: **Build > Generate Signed App Bundle / APK > APK > Create new**. Keep the `.jks` file somewhere outside the repository, and back it up. Losing it means you cannot update an installed app.
+
+2. Copy `keystore.properties.example` to `keystore.properties` in the project root and fill in your values:
+
+   ```properties
+   storeFile=C:/path/to/sweep-release.jks
+   storePassword=...
+   keyAlias=sweep
+   keyPassword=...
+   ```
+
+   The same four values can come from the `SWEEP_STORE_FILE`, `SWEEP_STORE_PASSWORD`, `SWEEP_KEY_ALIAS` and `SWEEP_KEY_PASSWORD` environment variables instead.
+
+3. Build it:
+
+   ```bash
+   ./gradlew releaseApkInfo
+   ```
+
+   This assembles the release APK and prints its name, size, signing status and SHA-256 checksum. `./gradlew assembleRelease` also works if you only want the file.
+
+The result is `app/build/outputs/apk/release/Sweep-v0.4.0-release.apk`. Without a keystore configured the build still succeeds and produces `Sweep-v0.4.0-release-unsigned.apk`, which Android will refuse to install.
+
+Send the checksum along with the APK so the person receiving it can confirm the file arrived intact.
+
+**Never commit** the `.jks` keystore, `keystore.properties`, or any password. Both are already in `.gitignore`. For normal releases, publish APKs through GitHub Releases. This repository keeps one prebuilt debug APK in `apk/` only for quick testing.
+
+A note on installing: sideloaded apps are unknown to Play Protect, and Android will warn about them. Signing the APK does not change that, and neither does anything else Sweep can do. Some antivirus apps are also suspicious of anything that requests broad storage access, which Sweep genuinely needs in order to work at all.
+
+---
+
+## Permissions and privacy
+
+Sweep ships with six permissions and no networking.
+
+| Permission | Why | Without it |
+| --- | --- | --- |
+| `MANAGE_EXTERNAL_STORAGE` | Read and delete files across shared storage on Android 11+ | No file scanning |
+| `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE` | The same thing on Android 8 to 10, where they still apply | No file scanning |
+| `PACKAGE_USAGE_STATS` | Last-opened dates and per-app storage sizes | No unused apps, no cache sizes |
+| `QUERY_ALL_PACKAGES` | Seeing the installed app list at all, under Android 11+ package visibility | The app list is nearly empty |
+| `REQUEST_DELETE_PACKAGES` | Launching Android's uninstall dialog | Uninstall silently does nothing |
+
+There is no `INTERNET` permission, so file lists and app names cannot leave the device even by accident. No account, no analytics, no crash reporting. Settings and the exclusion list live in local storage.
+
+The two storage permissions and Usage Access are genuinely powerful, and Sweep does not pretend otherwise. Both are granted from Android's own settings screens, and Sweep can only open those screens for you.
+
+---
+
+## Known limitations
+
+- **Usage history varies by device.** Sweep reads foreground events and all four usage buckets, but it cannot invent history a device never recorded. Apps without it stay under Usage unknown.
+- **Restricted Settings.** Manually installed builds can be blocked from enabling Usage Access until you allow restricted settings for the app.
+- **Sweep cannot clear another app's cache.** No third-party app can. It shows the sizes and opens the relevant Android page.
+- **Sweep cannot uninstall anything itself.** It opens Android's dialog and checks afterwards whether the package is gone.
+- **Deletions are permanent.** There is no recycle bin, and the confirmation sheet says so.
+- **Play Store distribution would be difficult.** `MANAGE_EXTERNAL_STORAGE` and `QUERY_ALL_PACKAGES` are both restricted permissions requiring justification.
+- **Exact duplicates only.** No perceptual or similar-image matching.
 
 ---
 
 ## Development status
 
-**Early functional MVP**
+**Functional MVP.** Core scanning, review, deletion, preview, cache reporting and unused-app detection all work on real hardware.
 
-Core storage scanning and cleanup functionality works, but several areas still require testing and refinement.
-
-The next development phase will focus mainly on:
+Next up:
 
 - testing on more devices and older Android versions;
-- verifying unused-app coverage across those devices;
+- checking how much usage history different devices actually expose;
 - edge cases and reliability.
 
 ---

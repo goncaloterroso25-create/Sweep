@@ -161,14 +161,14 @@ fun HomeScreen(
         if (!state.permissions.canScanFiles) {
             Spacer(Modifier.height(22.dp))
             NoticeCard(
-                title = "See what can go",
-                body = "Sweep needs file access to find old downloads, duplicates and installers. " +
-                    "Everything stays on your device. There is no account and no network.",
+                title = "Storage access",
+                body = "Needed to find duplicates, old downloads and other files worth removing. " +
+                    "Nothing leaves the device.",
                 icon = Icons.Outlined.Lock,
                 tint = colors.accent,
                 action = {
                     SweepButton(
-                        text = "Grant file access",
+                        text = "Allow storage access",
                         onClick = {
                             SystemFlows.launchFirstAvailable(
                                 context,

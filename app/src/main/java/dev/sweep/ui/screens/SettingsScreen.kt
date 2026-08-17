@@ -46,6 +46,7 @@ import dev.sweep.ui.SweepUiState
 import dev.sweep.ui.components.ButtonTone
 import dev.sweep.ui.components.HairLine
 import dev.sweep.ui.components.HapticProbe
+import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.SectionLabel
 import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.SweepButton
@@ -67,6 +68,7 @@ fun SettingsScreen(
     onHaptics: (Boolean) -> Unit,
     onMotion: (MotionPreference) -> Unit,
     onClearExclusions: () -> Unit,
+    onUsageAccessRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
@@ -186,7 +188,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(12.dp))
 
             PermissionRow(
-                title = "File access",
+                title = "Storage access",
                 granted = state.permissions.canScanFiles,
                 grantedText = "Granted. Sweep can scan shared storage.",
                 deniedText = "Not granted. File scanning is unavailable.",
@@ -204,27 +206,46 @@ fun SettingsScreen(
                 grantedText = "Granted. Sweep can see last-opened dates and app sizes.",
                 deniedText = "Not granted. Unused apps and cache sizes are unavailable.",
                 onOpen = {
+                    onUsageAccessRequested()
                     SystemFlows.launchFirstAvailable(
                         context,
                         SweepPermissions.usageAccessIntents(context),
                     )
                 },
             )
+            if (!state.permissions.hasUsageAccess) {
+                RestrictedSettingsHelp(autoExpand = state.usageAccessRefused)
+            }
 
             Spacer(Modifier.height(26.dp))
             HairLine()
             Spacer(Modifier.height(18.dp))
+            SectionLabel("About")
+            Spacer(Modifier.height(10.dp))
             Text(
                 text = "Sweep ${BuildConfig.VERSION_NAME}",
                 style = MaterialTheme.typography.titleMedium,
                 color = colors.text,
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(2.dp))
+            Text(
+                // Which build a tester is running, without having to guess from the icon.
+                text = "${BuildConfig.BUILD_TYPE} build, version code ${BuildConfig.VERSION_CODE}",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textFaint,
+            )
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = "Everything happens on this device. There is no account, no server and " +
                     "no network permission, so your file list cannot leave the phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textMute,
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "A personal project, not a commercial cleaner.",
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textFaint,
             )
             Spacer(Modifier.height(40.dp))
             Spacer(Modifier.navigationBarsPadding())

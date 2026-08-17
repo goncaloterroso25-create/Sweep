@@ -39,6 +39,7 @@ import dev.sweep.core.android.SweepPermissions
 import dev.sweep.core.android.SystemFlows
 import dev.sweep.ui.components.AppearIn
 import dev.sweep.ui.components.ButtonTone
+import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.theme.Grotesk
@@ -54,8 +55,10 @@ import dev.sweep.ui.theme.Sweep
 @Composable
 fun OnboardingScreen(
     permissions: PermissionStatus,
+    usageAccessRefused: Boolean,
     onContinue: () -> Unit,
     onPermissionsChanged: () -> Unit,
+    onUsageAccessRequested: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
@@ -96,12 +99,12 @@ fun OnboardingScreen(
         AppearIn(1) {
             PermissionBlock(
                 icon = Icons.Outlined.FolderOpen,
-                title = "See what can go",
-                body = "Sweep needs file access to find old downloads, duplicates and leftover " +
-                    "installers. Everything stays on your device.",
+                title = "Storage access",
+                body = "Needed to find duplicates, old downloads and other files worth removing. " +
+                    "It covers your shared storage, and nothing leaves the device.",
                 granted = permissions.canScanFiles,
-                grantedLabel = "File access granted",
-                buttonLabel = "Allow file access",
+                grantedLabel = "Storage access granted",
+                buttonLabel = "Allow storage access",
                 onGrant = {
                     if (SweepPermissions.usesRuntimeStoragePrompt) {
                         runtimeStorageLauncher.launch(SweepPermissions.runtimeStoragePermissions)
@@ -118,29 +121,36 @@ fun OnboardingScreen(
         Spacer(Modifier.height(14.dp))
 
         AppearIn(2) {
-            PermissionBlock(
-                icon = Icons.Outlined.Schedule,
-                title = "Find apps you forgot",
-                body = "Usage Access lets Sweep see when your apps were last opened. The data " +
-                    "stays on the device.",
-                granted = permissions.hasUsageAccess,
-                grantedLabel = "Usage Access granted",
-                buttonLabel = "Allow Usage Access",
-                onGrant = {
-                    SystemFlows.launchFirstAvailable(
-                        context,
-                        SweepPermissions.usageAccessIntents(context),
-                    )
-                },
-            )
+            Column {
+                PermissionBlock(
+                    icon = Icons.Outlined.Schedule,
+                    title = "Usage Access",
+                    body = "Used to work out when your apps were last opened, and to read app " +
+                        "storage sizes. Android may restrict this setting on manually installed " +
+                        "builds.",
+                    granted = permissions.hasUsageAccess,
+                    grantedLabel = "Usage Access granted",
+                    buttonLabel = "Allow Usage Access",
+                    onGrant = {
+                        onUsageAccessRequested()
+                        SystemFlows.launchFirstAvailable(
+                            context,
+                            SweepPermissions.usageAccessIntents(context),
+                        )
+                    },
+                )
+                if (!permissions.hasUsageAccess) {
+                    RestrictedSettingsHelp(autoExpand = usageAccessRefused)
+                }
+            }
         }
 
         Spacer(Modifier.height(22.dp))
 
         AppearIn(3) {
             Text(
-                text = "You can skip both. Sweep will open either way and tell you which parts " +
-                    "aren't available.",
+                text = "Both are optional. Skip either one and Sweep will say which parts are " +
+                    "unavailable.",
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.textFaint,
             )

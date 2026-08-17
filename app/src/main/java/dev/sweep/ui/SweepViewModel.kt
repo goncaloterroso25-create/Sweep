@@ -67,6 +67,13 @@ data class SweepUiState(
     val scanRootLabel: String = "",
     /** The one cache Sweep is allowed to clear: its own. */
     val ownCacheBytes: Long = 0L,
+    /** True from the moment the user opens the Usage Access settings screen. */
+    val usageAccessRequested: Boolean = false,
+    /**
+     * True once the user has opened the Usage Access screen and come back without it. Usually
+     * that means Android's Restricted Settings blocked the switch, so the help is offered.
+     */
+    val usageAccessRefused: Boolean = false,
 ) {
     val items: List<CleanupItem> get() = result?.items.orEmpty()
 
@@ -134,14 +141,22 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             _state.update {
+                val permissions = snapshot.first
                 it.copy(
-                    permissions = snapshot.first,
+                    permissions = permissions,
                     storage = snapshot.second,
                     scanRootLabel = snapshot.third,
+                    // Coming back from the settings screen still without the permission is the
+                    // signal that something blocked it, which on a sideloaded build is usually
+                    // Android's Restricted Settings. Granting it clears the flag again.
+                    usageAccessRefused = it.usageAccessRequested && !permissions.hasUsageAccess,
                 )
             }
         }
     }
+
+    /** Called as the Usage Access settings screen is opened, so a silent failure is detectable. */
+    fun noteUsageAccessRequested() = _state.update { it.copy(usageAccessRequested = true) }
 
     /**
      * Re-reads the storage figures alone.
