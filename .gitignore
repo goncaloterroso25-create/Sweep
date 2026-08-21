@@ -9,6 +9,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+
+# Ignore generated Android packages by default.
 *.apk
 *.aab
 
@@ -22,7 +24,7 @@ local.properties
 /.claude/
 .kotlin/
 
-# One intentionally tracked tester build for quick installation.
+# One intentionally tracked signed tester build for quick installation.
 !/apk/
-!/apk/Sweep-v0.5.0-debug.apk
-!/apk/SHA256SUMS.txt
+!/apk/Sweep-v0.5.0-release.apk
+!/apk/Sweep-v0.5.0-release.apk.sha256
