@@ -57,19 +57,23 @@ A physical device is much better than an emulator here. Real storage, real insta
 
 ## Prebuilt APK
 
-A prebuilt **Sweep v0.5.0 debug APK** is included in this repository for quick testing:
+A prebuilt **signed Sweep v0.5.0 release APK** is included in this repository for quick testing:
 
-```text
-apk/Sweep-v0.5.0-debug.apk
-```
+**[Download Sweep v0.5.0 release APK](apk/Sweep-v0.5.0-release.apk)**
+
+Checksum file:
+
+**[Sweep-v0.5.0-release.apk.sha256](apk/Sweep-v0.5.0-release.apk.sha256)**
 
 SHA-256:
 
 ```text
-01babdfbf919efcd07edbf1f621f7d22f458723af727fbfb86e0387a422440aa
+a54436d46587a4a37e7e838b208b4aeb3c4eb175a400d4a993dab364b8a11d31
 ```
 
-This is a debug build intended for testing, not a store release. Because it is installed manually, Android or third-party security software may show sideloading, Play Protect or Restricted Settings warnings. The source remains fully usable through Android Studio.
+This APK is signed with the project's release key and is intended for direct testing. It is still installed manually, so Android, Play Protect or third-party security software may show sideloading or Restricted Settings warnings.
+
+If you previously installed a debug build of Sweep, Android may refuse to install the release APK over it because the two builds use different signing identities. Uninstall the old debug build first, then install the release APK.
 
 ---
 
@@ -118,7 +122,7 @@ Send the checksum along with the APK so the person receiving it can confirm the 
 
 That produces `app/build/outputs/bundle/release/Sweep-v0.5.0-release.aab` and prints the same details. Play re-signs uploads with its own key through Play App Signing, so the key configured here is the upload key in that context. Sweep has not been submitted to Play, and two of its permissions need a declaration form with an uncertain outcome. See [docs/PLAY_STORE_READINESS.md](docs/PLAY_STORE_READINESS.md).
 
-**Never commit** the `.jks` keystore, `keystore.properties`, or any password. Both are already in `.gitignore`. The prebuilt debug APK in `apk/` is intentionally tracked for quick testing. Signed release APKs and App Bundles should normally be attached to GitHub Releases rather than committed to the source tree.
+**Never commit** the `.jks` keystore, `keystore.properties`, or any password. Both are already in `.gitignore`. The prebuilt signed release APK in `apk/` is intentionally tracked for quick testing. Future release APKs and App Bundles should normally be attached to GitHub Releases rather than accumulated in the source tree.
 
 A note on installing: sideloaded apps are unknown to Play Protect, and Android will warn about them. Signing the APK does not change that, and neither does anything else Sweep can do. Some antivirus apps are also suspicious of anything that requests broad storage access, which Sweep genuinely needs in order to work at all. A Play-distributed build would follow a different trust path, but since Sweep has never been through Play review, that is an expectation rather than something tested.
 
