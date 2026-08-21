@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +29,7 @@ import dev.sweep.ui.components.StorageMeter
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.title
 
 /**
@@ -114,7 +113,7 @@ fun CompletionScreen(
                             title = if (summary.failed.size == 1) "1 item couldn't be deleted"
                             else "${summary.failed.size} items couldn't be deleted",
                             body = failureBody(summary),
-                            icon = Icons.Outlined.Warning,
+                            icon = SweepIcons.Warning,
                             tint = colors.danger,
                         )
                     }

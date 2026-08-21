@@ -20,10 +20,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,6 +40,7 @@ import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.theme.Grotesk
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 
 /**
  * One screen, two asks, no dark patterns.
@@ -98,7 +95,7 @@ fun OnboardingScreen(
 
         AppearIn(1) {
             PermissionBlock(
-                icon = Icons.Outlined.FolderOpen,
+                icon = SweepIcons.Rescan,
                 title = "Storage access",
                 body = "Needed to find duplicates, old downloads and other files worth removing. " +
                     "It covers your shared storage, and nothing leaves the device.",
@@ -123,7 +120,7 @@ fun OnboardingScreen(
         AppearIn(2) {
             Column {
                 PermissionBlock(
-                    icon = Icons.Outlined.Schedule,
+                    icon = SweepIcons.Clock,
                     title = "Usage Access",
                     body = "Used to work out when your apps were last opened, and to read app " +
                         "storage sizes. Android may restrict this setting on manually installed " +
@@ -214,7 +211,7 @@ private fun PermissionBlock(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = if (granted) Icons.Outlined.Check else icon,
+                    imageVector = if (granted) SweepIcons.Check else icon,
                     contentDescription = null,
                     tint = if (granted) colors.accent else colors.textMute,
                     modifier = Modifier.size(18.dp),

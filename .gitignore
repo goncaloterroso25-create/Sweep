@@ -22,6 +22,7 @@ local.properties
 /.claude/
 .kotlin/
 
-# One prebuilt debug APK is intentionally included for quick testing.
+# One intentionally tracked tester build for quick installation.
 !/apk/
-!/apk/Sweep-v0.4.0-debug.apk
+!/apk/Sweep-v0.5.0-debug.apk
+!/apk/SHA256SUMS.txt

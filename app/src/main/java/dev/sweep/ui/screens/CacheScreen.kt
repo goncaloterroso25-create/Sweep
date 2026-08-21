@@ -20,9 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Cached
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,6 +51,7 @@ import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.components.SweepTopBar
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 
 /**
  * Cache assistance, stated plainly.
@@ -111,7 +109,7 @@ fun CacheScreen(
                     body = "Android does not let one app delete another app's cache. Sweep can " +
                         "measure the sizes and open each app's storage page, where you clear it " +
                         "yourself. Tap Manage on any app below.",
-                    icon = Icons.Outlined.Cached,
+                    icon = SweepIcons.Cache,
                     tint = colors.categoryTint(dev.sweep.core.model.CleanupCategory.SCREENSHOTS),
                 )
             }
@@ -155,7 +153,7 @@ fun CacheScreen(
                         title = "Cache sizes need Usage Access",
                         body = "Android reports per-app storage only to apps with Usage Access. " +
                             "Without it Sweep can't tell you which apps are worth clearing.",
-                        icon = Icons.Outlined.Schedule,
+                        icon = SweepIcons.Clock,
                         tint = colors.info,
                         action = {
                             SweepButton(

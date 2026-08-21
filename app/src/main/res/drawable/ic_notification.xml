@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Sweep mark as a status bar icon.
+
+  Android renders these as a silhouette in a single colour, so the mark is drawn in white with
+  the leftover fragment at reduced alpha and everything sized to sit inside the 24dp safe area.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:rotation="-14">
+
+        <path
+            android:pathData="M6.5,7 L18.5,7"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M10,12 L18.5,12"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M13.5,17 L18.5,17"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round" />
+
+        <!-- The fragment that has not been swept yet. -->
+        <path
+            android:pathData="M6,17 L6.01,17"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeAlpha="0.5"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round" />
+    </group>
+</vector>

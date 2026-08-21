@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dev.sweep.SweepApplication
 import dev.sweep.core.android.DeviceStorageInfo
 import dev.sweep.core.android.PermissionStatus
+import dev.sweep.core.android.ReminderWorker
 import dev.sweep.core.android.FileAccess
 import dev.sweep.core.android.ScanRoots
 import dev.sweep.core.data.MotionPreference
@@ -202,6 +203,9 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
                         is ScanUpdate.Complete -> {
                             // A long scan can outlive the figures shown when it started.
                             refreshStorage()
+                            // The only honest number a background reminder can quote later is
+                            // one a real scan actually measured, so it is recorded here.
+                            settingsStore.recordScanResult(update.result.totalFoundBytes)
                             _state.update {
                                 it.copy(
                                     stage = Stage.RESULTS,
@@ -431,6 +435,31 @@ class SweepViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun completeOnboarding() = viewModelScope.launch { settingsStore.setOnboardingComplete() }
+
+    // ---- reminders ---------------------------------------------------------------------------
+
+    /**
+     * Both switches write the setting and then bring the schedule in line with it, so turning the
+     * last one off cancels the work rather than leaving a job running for nobody.
+     */
+    fun setCleanupReminders(enabled: Boolean) = viewModelScope.launch {
+        settingsStore.setCleanupReminders(enabled)
+        syncReminderWork()
+    }
+
+    fun setUnusedAppReminders(enabled: Boolean) = viewModelScope.launch {
+        settingsStore.setUnusedAppReminders(enabled)
+        syncReminderWork()
+    }
+
+    fun setReminderThreshold(bytes: Long) = viewModelScope.launch {
+        settingsStore.setReminderThreshold(bytes)
+    }
+
+    private suspend fun syncReminderWork() {
+        val settings = settingsStore.currentSettings()
+        ReminderWorker.sync(getApplication(), settings.anyReminderEnabled)
+    }
 
     private companion object {
         /** `Activity.RESULT_FIRST_USER`, which ACTION_UNINSTALL_PACKAGE uses to mean "failed". */

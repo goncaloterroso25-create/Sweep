@@ -20,9 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -57,6 +54,7 @@ import dev.sweep.core.scan.FileClassifier
 import dev.sweep.ui.icon
 import dev.sweep.ui.reasonLabel
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.theme.springBouncy
 import dev.sweep.ui.theme.springGentle
 import dev.sweep.ui.theme.springSettle
@@ -187,7 +185,7 @@ fun FileRow(
             )
             // Quiet affordance for the other half of the row: there is more to see here.
             Icon(
-                Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                SweepIcons.ChevronRight,
                 contentDescription = null,
                 tint = colors.textFaint,
                 modifier = Modifier
@@ -204,7 +202,7 @@ fun FileRow(
             DropdownMenuItem(
                 text = { Text("Don't suggest this again", color = colors.text) },
                 leadingIcon = {
-                    Icon(Icons.Outlined.Block, contentDescription = null, tint = colors.textMute)
+                    Icon(SweepIcons.Exclude, contentDescription = null, tint = colors.textMute)
                 },
                 onClick = {
                     menuOpen = false

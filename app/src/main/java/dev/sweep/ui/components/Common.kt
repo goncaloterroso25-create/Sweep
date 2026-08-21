@@ -16,8 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +30,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.theme.springSnappy
 
 /** Small uppercase eyebrow used above every section. */
@@ -203,7 +202,7 @@ fun SweepTopBar(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.AutoMirrored.Outlined.ArrowBack,
+                    SweepIcons.Back,
                     contentDescription = "Back",
                     tint = colors.text,
                     modifier = Modifier.size(21.dp),

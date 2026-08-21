@@ -17,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -48,6 +46,7 @@ import dev.sweep.ui.components.SweepTopBar
 import dev.sweep.ui.components.pressable
 import dev.sweep.ui.emptyLine
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.title
 
 private enum class SortOrder(val label: String) {
@@ -150,7 +149,7 @@ fun CategoryScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Icon(
-                            Icons.Outlined.SwapVert,
+                            SweepIcons.Sort,
                             contentDescription = null,
                             tint = colors.textMute,
                             modifier = Modifier.size(15.dp),

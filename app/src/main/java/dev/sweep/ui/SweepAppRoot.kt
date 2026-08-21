@@ -26,6 +26,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import dev.sweep.core.android.SweepNotifications
 import dev.sweep.core.model.CleanupCategory
 import dev.sweep.ui.components.ConfirmCleanSheet
 import dev.sweep.ui.components.SelectionBar
@@ -60,7 +61,12 @@ private object Routes {
  * one path to a deletion no matter where the user started.
  */
 @Composable
-fun SweepAppRoot(viewModel: SweepViewModel) {
+fun SweepAppRoot(
+    viewModel: SweepViewModel,
+    /** Set when a reminder was tapped. Consumed once, then cleared. */
+    openDestination: String? = null,
+    onDestinationHandled: () -> Unit = {},
+) {
     val state by viewModel.state.collectAsState()
 
     SweepTheme(motionPreference = state.settings.motion) {
@@ -89,6 +95,18 @@ fun SweepAppRoot(viewModel: SweepViewModel) {
 
         val startDestination = remember {
             if (state.settings.onboardingComplete) Routes.HOME else Routes.ONBOARDING
+        }
+
+        // A tapped reminder goes straight to the screen it was about, but never over the top of
+        // onboarding: someone who has not finished setting the app up is not who it was for.
+        LaunchedEffect(openDestination, state.settings.onboardingComplete) {
+            if (openDestination == SweepNotifications.DESTINATION_UNUSED_APPS &&
+                state.settings.onboardingComplete
+            ) {
+                viewModel.loadApps()
+                navController.navigate(Routes.APPS) { launchSingleTop = true }
+                onDestinationHandled()
+            }
         }
 
         Box(Modifier.fillMaxSize().background(colors.base)) {
@@ -278,6 +296,9 @@ private fun SweepNavHost(
                 onMotion = viewModel::setMotion,
                 onClearExclusions = { viewModel.clearExclusions() },
                 onUsageAccessRequested = viewModel::noteUsageAccessRequested,
+                onCleanupReminders = viewModel::setCleanupReminders,
+                onUnusedAppReminders = viewModel::setUnusedAppReminders,
+                onReminderThreshold = viewModel::setReminderThreshold,
             )
         }
     }

@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,6 +25,7 @@ import dev.sweep.core.model.ByteFormat
 import dev.sweep.core.model.CategorySummary
 import dev.sweep.ui.icon
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.title
 
 /**
@@ -101,7 +100,7 @@ fun CategoryCard(
         }
 
         Icon(
-            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            SweepIcons.ChevronRight,
             contentDescription = null,
             tint = colors.textFaint,
             modifier = Modifier
@@ -167,7 +166,7 @@ fun UtilityCard(
             Text(trailing, style = MaterialTheme.typography.titleMedium, color = colors.text)
         }
         Icon(
-            Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+            SweepIcons.ChevronRight,
             contentDescription = null,
             tint = colors.textFaint,
             modifier = Modifier.size(20.dp),

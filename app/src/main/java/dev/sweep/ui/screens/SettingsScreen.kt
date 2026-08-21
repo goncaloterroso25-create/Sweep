@@ -1,5 +1,9 @@
 package dev.sweep.ui.screens
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.sweep.BuildConfig
+import dev.sweep.core.android.SweepNotifications
 import dev.sweep.core.android.SweepPermissions
 import dev.sweep.core.android.SystemFlows
 import dev.sweep.core.data.MotionPreference
@@ -48,6 +53,7 @@ import dev.sweep.ui.components.HairLine
 import dev.sweep.ui.components.HapticProbe
 import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.SectionLabel
+import dev.sweep.ui.components.SegmentedChoice
 import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
@@ -69,6 +75,9 @@ fun SettingsScreen(
     onMotion: (MotionPreference) -> Unit,
     onClearExclusions: () -> Unit,
     onUsageAccessRequested: () -> Unit,
+    onCleanupReminders: (Boolean) -> Unit,
+    onUnusedAppReminders: (Boolean) -> Unit,
+    onReminderThreshold: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
@@ -151,6 +160,17 @@ fun SettingsScreen(
                     }
                 },
                 onSelect = onMotion,
+            )
+
+            Spacer(Modifier.height(22.dp))
+            SectionLabel("Reminders")
+            Spacer(Modifier.height(12.dp))
+            RemindersSection(
+                settings = settings,
+                onCleanupReminders = onCleanupReminders,
+                onUnusedAppReminders = onUnusedAppReminders,
+                onReminderThreshold = onReminderThreshold,
+                usageAccessGranted = state.permissions.hasUsageAccess,
             )
 
             Spacer(Modifier.height(22.dp))
@@ -254,6 +274,114 @@ fun SettingsScreen(
 }
 
 /**
+ * Two reminders, both off until asked for.
+ *
+ * The notification permission is requested here, at the moment a switch is turned on, rather than
+ * during onboarding. Someone who never wants reminders is never asked, and someone who does has
+ * already been told what it is for by the row they just tapped. A denial leaves the switch off and
+ * says so, with a way into Android's settings, and nothing asks again on its own.
+ */
+@Composable
+private fun RemindersSection(
+    settings: dev.sweep.core.data.SweepSettings,
+    usageAccessGranted: Boolean,
+    onCleanupReminders: (Boolean) -> Unit,
+    onUnusedAppReminders: (Boolean) -> Unit,
+    onReminderThreshold: (Long) -> Unit,
+) {
+    val colors = Sweep.colors
+    val context = LocalContext.current
+    var denied by remember { mutableStateOf(false) }
+    // Which switch asked, so the permission result can be applied to the right one.
+    var pending by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        denied = !granted
+        if (granted) pending?.invoke(true)
+        pending = null
+    }
+
+    /** Turns a reminder on, asking Android first if this version requires it. */
+    fun enable(setter: (Boolean) -> Unit) {
+        if (SweepNotifications.canNotify(context)) {
+            denied = false
+            setter(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pending = setter
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            // Pre-13 there is no runtime permission, so this can only be the app-level switch.
+            denied = true
+        }
+    }
+
+    ToggleRow(
+        title = "Cleanup reminders",
+        caption = "An occasional note when a scan has found a meaningful amount worth reviewing.",
+        checked = settings.cleanupReminders,
+        onChange = { wanted -> if (wanted) enable(onCleanupReminders) else onCleanupReminders(false) },
+    )
+
+    if (settings.cleanupReminders) {
+        ChoiceRow(
+            title = "Remind me above",
+            caption = "Sweep uses the amount your last scan measured, never a guess.",
+            options = REMINDER_THRESHOLDS,
+            selected = settings.reminderThresholdBytes,
+            label = { ByteFormat.short(it) },
+            onSelect = onReminderThreshold,
+        )
+    }
+
+    ToggleRow(
+        title = "Unused app reminders",
+        caption = if (usageAccessGranted) {
+            "A note when apps pass your inactivity threshold."
+        } else {
+            "Needs Usage Access, which is not granted yet."
+        },
+        checked = settings.unusedAppReminders,
+        onChange = { wanted ->
+            if (wanted) enable(onUnusedAppReminders) else onUnusedAppReminders(false)
+        },
+    )
+
+    if (denied) {
+        Text(
+            text = "Android is blocking notifications for Sweep, so reminders stay off. You can " +
+                "turn them on in Android's notification settings.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.danger,
+        )
+        Spacer(Modifier.height(6.dp))
+        SweepTextButton(
+            text = "Open notification settings",
+            onClick = {
+                SystemFlows.launchFirstAvailable(context, SystemFlows.notificationSettingsIntents(context))
+            },
+            color = colors.accent,
+        )
+    } else if (settings.anyReminderEnabled) {
+        Text(
+            text = "Checked about once a week, when the battery is not low.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textFaint,
+        )
+    }
+}
+
+private val REMINDER_THRESHOLDS = listOf(
+    1L * 1000 * 1000 * 1000,
+    3L * 1000 * 1000 * 1000,
+    5L * 1000 * 1000 * 1000,
+    10L * 1000 * 1000 * 1000,
+)
+
+/**
  * One tap, one honest answer.
  *
  * Haptics are the one part of the app that cannot be verified by looking at it, and Sweep's switch
@@ -349,26 +477,12 @@ private fun <T> ChoiceRow(
         Spacer(Modifier.height(2.dp))
         Text(caption, style = MaterialTheme.typography.bodySmall, color = colors.textMute)
         Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { option ->
-                val active = option == selected
-                Text(
-                    text = label(option),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (active) colors.onAccent else colors.textMute,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (active) colors.accent else colors.surface)
-                        .border(
-                            1.dp,
-                            if (active) colors.accent else colors.line,
-                            RoundedCornerShape(9.dp),
-                        )
-                        .pressable(onClick = { onSelect(option) })
-                        .padding(horizontal = 13.dp, vertical = 8.dp),
-                )
-            }
-        }
+        SegmentedChoice(
+            options = options,
+            selected = selected,
+            label = label,
+            onSelect = onSelect,
+        )
     }
 }
 

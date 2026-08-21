@@ -32,10 +32,12 @@ import dev.sweep.ui.theme.sweepTween
 /**
  * The way out of Android's Restricted Settings.
  *
- * Android blocks sensitive toggles like Usage Access for apps that were installed manually rather
- * than from a store, and the switch simply refuses with "App was denied access". That is Android
- * protecting the user from sideloaded apps, which is reasonable, and Sweep does not try to work
- * around it.
+ * Android blocks sensitive toggles like Usage Access for apps whose installer did not use the
+ * session-based install API, which in practice means most manual installs: a file manager, a chat
+ * app, a browser download. Store installs and `adb install` go through the session API and are not
+ * affected, which is why the same APK is restricted on one phone and not another. Nothing about
+ * the app itself changes the outcome, so there is nothing here for Sweep to fix, and deliberately
+ * no attempt to work around a security control.
  *
  * What it can do is explain the way through. This stays a quiet link most of the time, and opens
  * itself only for someone who has already tried and come back without the permission, so a user
@@ -74,7 +76,7 @@ fun RestrictedSettingsHelp(
             ) {
                 Text(
                     text = "Android restricts some settings for apps installed manually instead " +
-                        "of from a store. If the Usage Access switch is greyed out or says the " +
+                        "of from a store. If the Usage Access switch is greyed out, or says the " +
                         "app was denied access:",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textMute,
@@ -86,7 +88,9 @@ fun RestrictedSettingsHelp(
                 Step(4, "Come back and turn Usage Access on again.")
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Manufacturers word this differently, so the menu may not match exactly.",
+                    text = "Manufacturers word this differently, so the menu may not match " +
+                        "exactly. Whether it appears at all depends on how the file was " +
+                        "installed, which is why one phone asks and another does not.",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.textFaint,
                 )

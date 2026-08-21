@@ -4,7 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.media.MediaScannerConnection
-import android.net.Uri
+import androidx.core.net.toUri
 import android.provider.Settings
 
 /**
@@ -36,7 +36,7 @@ object SystemFlows {
      */
     @Suppress("DEPRECATION")
     fun uninstallIntents(packageName: String): List<Intent> {
-        val target = Uri.parse("package:$packageName")
+        val target = "package:$packageName".toUri()
         return listOf(
             Intent(Intent.ACTION_UNINSTALL_PACKAGE, target)
                 .putExtra(Intent.EXTRA_RETURN_RESULT, true),
@@ -46,7 +46,7 @@ object SystemFlows {
     }
 
     fun appDetailsIntent(packageName: String): Intent =
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())
 
     fun storageSettingsIntent(): Intent = Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS)
 
@@ -57,6 +57,13 @@ object SystemFlows {
     fun soundSettingsIntents(): List<Intent> = listOf(
         Intent(Settings.ACTION_SOUND_SETTINGS),
         Intent(Settings.ACTION_SETTINGS),
+    )
+
+    /** Sweep's own notification settings, for when Android is the one saying no. */
+    fun notificationSettingsIntents(context: Context): List<Intent> = listOf(
+        Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+        appDetailsIntent(context.packageName),
     )
 
     fun isInstalled(context: Context, packageName: String): Boolean = try {

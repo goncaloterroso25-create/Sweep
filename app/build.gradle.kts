@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val appVersionName = "0.4.0"
+val appVersionName = "0.5.0"
 
 /**
  * Release signing details, read from `keystore.properties` at the project root or from the
@@ -37,7 +37,7 @@ val canSignRelease = releaseKeystore != null &&
     releaseKeyAlias != null &&
     releaseKeyPassword != null
 
-// Produces Sweep-v0.4.0-release.apk rather than app-release.apk, so a tester can tell at a
+// Produces Sweep-v0.5.0-release.apk rather than app-release.apk, so a tester can tell at a
 // glance which build they were sent.
 base {
     archivesName.set("Sweep-v$appVersionName")
@@ -45,13 +45,13 @@ base {
 
 android {
     namespace = "dev.sweep"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "dev.sweep"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 4
+        targetSdk = 36
+        versionCode = 5
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -118,33 +118,57 @@ android {
  * A tester who receives the file over a chat app can compare the hash before installing, which is
  * the only part of "is this the file you meant to send me" that is actually verifiable by hand.
  */
-val releaseApkDirectory = layout.buildDirectory.dir("outputs/apk/release")
+private fun Project.reportArtifacts(directory: java.io.File, signed: Boolean, extension: String) {
+    val files = directory.listFiles()?.filter { it.extension == extension }.orEmpty()
+    if (files.isEmpty()) {
+        logger.lifecycle("No .$extension found in $directory")
+        return
+    }
+    files.forEach { artifact ->
+        val digest = MessageDigest.getInstance("SHA-256").digest(artifact.readBytes())
+        logger.lifecycle("")
+        logger.lifecycle("File     ${artifact.name}")
+        logger.lifecycle("Size     ${"%.1f".format(artifact.length() / 1_000_000.0)} MB")
+        logger.lifecycle(
+            "Signed   " + if (signed) {
+                "yes, with the configured release key"
+            } else {
+                "NO, keystore.properties is missing"
+            }
+        )
+        logger.lifecycle("SHA-256  ${digest.joinToString("") { "%02x".format(it) }}")
+        logger.lifecycle("Path     ${artifact.absolutePath}")
+    }
+}
 
 tasks.register("releaseApkInfo") {
     group = "distribution"
     description = "Assembles the release APK and prints its name, size and SHA-256 checksum."
     dependsOn("assembleRelease")
 
-    val outputDirectory = releaseApkDirectory
+    val outputDirectory = layout.buildDirectory.dir("outputs/apk/release")
     val signed = canSignRelease
 
-    doLast {
-        val apks = outputDirectory.get().asFile.listFiles()?.filter { it.extension == "apk" }.orEmpty()
-        if (apks.isEmpty()) {
-            logger.lifecycle("No release APK found in ${outputDirectory.get().asFile}")
-            return@doLast
-        }
-        apks.forEach { apk ->
-            val digest = MessageDigest.getInstance("SHA-256").digest(apk.readBytes())
-            val checksum = digest.joinToString("") { "%02x".format(it) }
-            logger.lifecycle("")
-            logger.lifecycle("File     ${apk.name}")
-            logger.lifecycle("Size     ${"%.1f".format(apk.length() / 1_000_000.0)} MB")
-            logger.lifecycle("Signed   ${if (signed) "yes, with the configured release key" else "NO, keystore.properties is missing"}")
-            logger.lifecycle("SHA-256  $checksum")
-            logger.lifecycle("Path     ${apk.absolutePath}")
-        }
-    }
+    doLast { reportArtifacts(outputDirectory.get().asFile, signed, "apk") }
+}
+
+/**
+ * The artifact Google Play actually wants.
+ *
+ * Play has required an App Bundle rather than an APK for new apps since 2021, and it re-signs
+ * whatever is uploaded with its own key through Play App Signing. The key configured here is
+ * therefore the *upload* key in that world, and the same one that signs the direct-download APK
+ * in this one, which is fine: they serve different distribution paths and neither is the other.
+ */
+tasks.register("releaseBundleInfo") {
+    group = "distribution"
+    description = "Builds the signed release App Bundle for Play and prints its checksum."
+    dependsOn("bundleRelease")
+
+    val outputDirectory = layout.buildDirectory.dir("outputs/bundle/release")
+    val signed = canSignRelease
+
+    doLast { reportArtifacts(outputDirectory.get().asFile, signed, "aab") }
 }
 
 dependencies {
@@ -162,6 +186,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
+    implementation(libs.androidx.work.runtime)
 
     debugImplementation(libs.androidx.ui.tooling)
 

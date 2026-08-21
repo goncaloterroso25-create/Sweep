@@ -25,12 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Apps
-import androidx.compose.material.icons.outlined.Cached
-import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -72,6 +66,7 @@ import dev.sweep.ui.components.pressable
 import dev.sweep.ui.components.rememberSweepPhase
 import dev.sweep.ui.components.sweepGlow
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.theme.sweepTween
 import java.io.File
 import java.util.Locale
@@ -126,7 +121,7 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Outlined.Settings,
+                    SweepIcons.Settings,
                     contentDescription = "Settings",
                     tint = colors.textMute,
                     modifier = Modifier.size(21.dp),
@@ -164,7 +159,7 @@ fun HomeScreen(
                 title = "Storage access",
                 body = "Needed to find duplicates, old downloads and other files worth removing. " +
                     "Nothing leaves the device.",
-                icon = Icons.Outlined.Lock,
+                icon = SweepIcons.Lock,
                 tint = colors.accent,
                 action = {
                     SweepButton(
@@ -230,7 +225,7 @@ fun HomeScreen(
                 trailing = state.apps
                     ?.takeIf { it.hasUsageAccess && it.reclaimableBytes > 0 }
                     ?.let { ByteFormat.short(it.reclaimableBytes) },
-                icon = Icons.Outlined.Apps,
+                icon = SweepIcons.Apps,
                 tint = colors.info,
                 onClick = onOpenApps,
             )
@@ -240,7 +235,7 @@ fun HomeScreen(
                 trailing = state.apps?.totalCacheBytes
                     ?.takeIf { it > 0 }
                     ?.let { ByteFormat.short(it) },
-                icon = Icons.Outlined.Cached,
+                icon = SweepIcons.Cache,
                 tint = colors.categoryTint(CleanupCategory.SCREENSHOTS),
                 onClick = onOpenCache,
             )
@@ -428,7 +423,7 @@ private fun ScanPanel(
                     SweepTextButton(
                         text = "Scan again",
                         onClick = onRescan,
-                        icon = Icons.Outlined.FolderOpen,
+                        icon = SweepIcons.Rescan,
                     )
                 }
             }

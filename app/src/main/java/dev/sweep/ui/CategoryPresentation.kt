@@ -1,14 +1,7 @@
 package dev.sweep.ui
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Android
-import androidx.compose.material.icons.outlined.Archive
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.ui.graphics.vector.ImageVector
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.core.model.AgeFormat
 import dev.sweep.core.model.ByteFormat
 import dev.sweep.core.model.CleanupCategory
@@ -54,13 +47,13 @@ val CleanupCategory.emptyLine: String
 
 val CleanupCategory.icon: ImageVector
     get() = when (this) {
-        CleanupCategory.DUPLICATES -> Icons.Outlined.ContentCopy
-        CleanupCategory.INSTALLERS -> Icons.Outlined.Android
-        CleanupCategory.ARCHIVES -> Icons.Outlined.Archive
-        CleanupCategory.SCREENSHOTS -> Icons.Outlined.PhotoLibrary
-        CleanupCategory.DOWNLOADS -> Icons.Outlined.FileDownload
-        CleanupCategory.LARGE_FILES -> Icons.Outlined.Storage
-        CleanupCategory.EMPTY_FOLDERS -> Icons.Outlined.Folder
+        CleanupCategory.DUPLICATES -> SweepIcons.Duplicates
+        CleanupCategory.INSTALLERS -> SweepIcons.Installers
+        CleanupCategory.ARCHIVES -> SweepIcons.Archives
+        CleanupCategory.SCREENSHOTS -> SweepIcons.Screenshots
+        CleanupCategory.DOWNLOADS -> SweepIcons.Downloads
+        CleanupCategory.LARGE_FILES -> SweepIcons.LargeFiles
+        CleanupCategory.EMPTY_FOLDERS -> SweepIcons.EmptyFolders
     }
 
 /**

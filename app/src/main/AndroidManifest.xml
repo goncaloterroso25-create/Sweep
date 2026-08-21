@@ -40,6 +40,29 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!--
+      Optional reminders, off by default. Android 13+ treats this as a runtime permission, and
+      Sweep only asks for it at the moment the user switches a reminder on, never at launch.
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      WorkManager contributes four permissions of its own to the merged manifest. Two are removed
+      here because Sweep's reminder job cannot use them: it declares no network constraint, so
+      ACCESS_NETWORK_STATE is dead weight, and it never runs expedited work, so it never starts a
+      foreground service. An app that tells people it has no networking should not ship a network
+      permission it does not use.
+
+      WAKE_LOCK and RECEIVE_BOOT_COMPLETED are kept: the first is how WorkManager finishes a job it
+      has started, and the second is what lets a weekly reminder survive a reboot.
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.FOREGROUND_SERVICE"
+        tools:node="remove" />
+
     <application
         android:name=".SweepApplication"
         android:allowBackup="false"

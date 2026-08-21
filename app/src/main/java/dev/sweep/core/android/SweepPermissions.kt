@@ -5,7 +5,7 @@ import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 import android.os.Build
 import android.os.Environment
 import android.os.Process
@@ -98,7 +98,7 @@ object SweepPermissions {
             listOf(
                 Intent(
                     Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                    Uri.parse("package:${context.packageName}"),
+                    "package:${context.packageName}".toUri(),
                 ),
                 Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
                 appDetailsIntent(context.packageName),
@@ -109,13 +109,13 @@ object SweepPermissions {
 
     fun usageAccessIntents(context: Context): List<Intent> = listOf(
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
-            .setData(Uri.parse("package:${context.packageName}")),
+            .setData("package:${context.packageName}".toUri()),
         Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS),
         Intent(Settings.ACTION_SETTINGS),
     )
 
     fun appDetailsIntent(packageName: String): Intent =
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$packageName".toUri())
 
     private fun granted(context: Context, permission: String) =
         context.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED

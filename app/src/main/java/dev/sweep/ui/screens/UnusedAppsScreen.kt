@@ -14,6 +14,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -30,10 +34,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Block
-import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,11 +66,13 @@ import dev.sweep.ui.components.NoticeCard
 import dev.sweep.ui.components.RestrictedSettingsHelp
 import dev.sweep.ui.components.RevealIn
 import dev.sweep.ui.components.SectionLabel
+import dev.sweep.ui.components.SegmentedChoice
 import dev.sweep.ui.components.SweepButton
 import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.components.SweepTopBar
 import dev.sweep.ui.components.pressable
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepIcons
 import dev.sweep.ui.theme.springGentle
 import dev.sweep.ui.theme.sweepTween
 
@@ -150,7 +152,7 @@ fun UnusedAppsScreen(
                     title = "Find apps you forgot",
                     body = "Usage Access tells Sweep when each app was last opened, and how much " +
                         "space it uses. Android grants it from its own settings screen.",
-                    icon = Icons.Outlined.Schedule,
+                    icon = SweepIcons.Clock,
                     tint = colors.info,
                     action = {
                         SweepButton(
@@ -312,7 +314,7 @@ private fun AppNotice(text: String?, onDismiss: () -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Outlined.Close,
+                    SweepIcons.Close,
                     contentDescription = "Dismiss",
                     tint = colors.textMute,
                     modifier = Modifier.size(16.dp),
@@ -324,33 +326,32 @@ private fun AppNotice(text: String?, onDismiss: () -> Unit) {
 
 @Composable
 private fun ThresholdRow(selected: Int, onSelect: (Int) -> Unit) {
-    val colors = Sweep.colors
     Column(Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
         SectionLabel("Unused for at least")
         Spacer(Modifier.height(9.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            UnusedAppPolicy.THRESHOLD_CHOICES.forEach { days ->
-                val active = days == selected
-                Text(
-                    text = "${days}d",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (active) colors.onAccent else colors.textMute,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (active) colors.accent else colors.surface)
-                        .border(
-                            1.dp,
-                            if (active) colors.accent else colors.line,
-                            RoundedCornerShape(9.dp),
-                        )
-                        .pressable(onClick = { onSelect(days) })
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                )
-            }
-        }
+        SegmentedChoice(
+            options = UnusedAppPolicy.THRESHOLD_CHOICES,
+            selected = selected,
+            label = { "$it days" },
+            onSelect = onSelect,
+        )
     }
 }
 
+/**
+ * One app, with the two facts that decide whether it should go.
+ *
+ * How long ago it was last opened and how much space it takes are the entire point of this
+ * screen, so neither is allowed to truncate. Previously both were crammed into one ellipsised
+ * line and the size was the half that disappeared, which meant the row showed a reason to
+ * uninstall without the payoff. Now the name ellipsises, the two values wrap onto a second line
+ * when they have to, and the size is set in the text colour so it reads as a figure rather than
+ * as a caption.
+ *
+ * On a narrow screen, or at a large font scale, the actions move to their own line instead of
+ * squeezing the values into a column a few characters wide.
+ */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AppRow(
     app: InstalledApp,
@@ -372,69 +373,107 @@ private fun AppRow(
         }.getOrNull()
     }
 
-    Row(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .clip(shape)
             .background(colors.surface)
             .border(1.dp, colors.line.copy(alpha = 0.8f), shape)
             .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(11.dp))
-                .background(colors.surfaceHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            icon?.let {
-                Image(bitmap = it, contentDescription = null, modifier = Modifier.size(30.dp))
+        val stacked = maxWidth < STACK_ACTIONS_BELOW
+
+        val appIcon: @Composable () -> Unit = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(colors.surfaceHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                icon?.let {
+                    Image(bitmap = it, contentDescription = null, modifier = Modifier.size(30.dp))
+                }
             }
         }
 
-        Spacer(Modifier.width(13.dp))
-
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = app.label,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.text,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = buildString {
-                    append(detail)
-                    if (app.totalBytes > 0) append(", ${ByteFormat.short(app.totalBytes)}")
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textMute,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+        val details: @Composable (Modifier) -> Unit = { columnModifier ->
+            Column(columnModifier) {
+                Text(
+                    text = app.label,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.text,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(2.dp))
+                // Wraps rather than truncates. Both values survive on any width.
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
+                ) {
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textMute,
+                    )
+                    if (app.totalBytes > 0) {
+                        Text(
+                            text = ByteFormat.short(app.totalBytes),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.text,
+                        )
+                    }
+                }
+            }
         }
 
-        Spacer(Modifier.width(8.dp))
-
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .pressable(onClick = onExclude),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Icons.Outlined.Block,
-                contentDescription = "Don't suggest ${app.label} again",
-                tint = colors.textFaint,
-                modifier = Modifier.size(17.dp),
-            )
+        val actions: @Composable RowScope.() -> Unit = {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .pressable(onClick = onExclude),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    SweepIcons.Exclude,
+                    contentDescription = "Don't suggest ${app.label} again",
+                    tint = colors.textFaint,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
+            SweepTextButton(text = actionText, onClick = onAction, color = actionColor)
         }
 
-        SweepTextButton(text = actionText, onClick = onAction, color = actionColor)
+        if (stacked) {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    appIcon()
+                    Spacer(Modifier.width(13.dp))
+                    details(Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) { actions() }
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                appIcon()
+                Spacer(Modifier.width(13.dp))
+                details(Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                actions()
+            }
+        }
     }
 }
+
+/** Below this the actions get their own line, so the two values keep their space. */
+private val STACK_ACTIONS_BELOW = 300.dp
 
 /** App icons are decoded at list-row size, not at their intrinsic adaptive-icon resolution. */
 internal const val ICON_PX = 96

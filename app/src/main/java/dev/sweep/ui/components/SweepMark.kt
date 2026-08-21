@@ -73,8 +73,14 @@ fun SweepMark(
 
         lengths.forEachIndexed { index, length ->
             val y = h * (0.30f + index * 0.20f) + (index - 1) * tilt
-            // Bars extend from the right edge back to the left, in the direction of the sweep.
-            val drawn = length * progress
+            // Each bar starts fractionally after the one above it, so the mark assembles itself
+            // top-down in the direction of the sweep instead of all three appearing at once.
+            // This is the whole launch animation: it happens in the first frame of real content,
+            // costs nothing at startup, and there is no splash screen anywhere in the app.
+            val staggered = ((progress - index * BAR_STAGGER) / (1f - BAR_STAGGER * 2f))
+                .coerceIn(0f, 1f)
+            val drawn = length * staggered
+            if (drawn <= 0f) return@forEachIndexed
             drawLine(
                 color = colors.accent,
                 start = androidx.compose.ui.geometry.Offset(right - w * drawn, y),
@@ -84,10 +90,10 @@ fun SweepMark(
             )
         }
 
-        // The fragment that has not been swept yet.
+        // The fragment that has not been swept yet. It arrives last, which is the joke.
         val fragmentY = h * 0.70f + tilt
         drawLine(
-            color = colors.accent.copy(alpha = 0.45f * progress),
+            color = colors.accent.copy(alpha = 0.45f * ((progress - 0.55f) / 0.45f).coerceIn(0f, 1f)),
             start = androidx.compose.ui.geometry.Offset(w * 0.15f, fragmentY),
             end = androidx.compose.ui.geometry.Offset(w * 0.17f, fragmentY),
             strokeWidth = stroke,
@@ -95,6 +101,9 @@ fun SweepMark(
         )
     }
 }
+
+/** How far into the animation each successive bar begins. */
+private const val BAR_STAGGER = 0.16f
 
 /** The mark and the wordmark, locked together as the app's header identity. */
 @Composable
