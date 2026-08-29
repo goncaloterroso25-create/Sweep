@@ -36,6 +36,21 @@ Reminders are off until you turn them on in Settings, and Sweep only asks for no
 
 ---
 
+## Development Approach
+
+Sweep is an AI-assisted development project.
+
+I created the product concept, feature set, UX/UI direction and interaction
+design, and handled testing, debugging, iteration and release decisions.
+AI coding tools were used extensively for implementation, particularly for
+Kotlin and Jetpack Compose development.
+
+The project is not intended to represent native Kotlin expertise, but rather
+my ability to design, direct and ship a functional digital product using
+modern development workflows.
+
+---
+
 ## Running Sweep
 
 You need [Android Studio](https://developer.android.com/studio) (Ladybug or newer) and **JDK 17**. Android Studio bundles a suitable JDK, so a separate install is usually unnecessary.
