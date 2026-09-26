@@ -10,9 +10,14 @@
 .cxx
 local.properties
 
-# Ignore generated Android packages by default.
+# Android packages are build outputs by default.
 *.apk
 *.aab
+
+# One intentionally tracked v0.6 tester APK and its checksum.
+!/apk/
+!/apk/Sweep-v0.6.0-debug.apk
+!/apk/Sweep-v0.6.0-debug.apk.sha256
 
 # Release signing. None of this belongs in the repository.
 /keystore.properties
@@ -23,8 +28,3 @@ local.properties
 # Claude Code worktrees and session data.
 /.claude/
 .kotlin/
-
-# One intentionally tracked signed tester build for quick installation.
-!/apk/
-!/apk/Sweep-v0.5.0-release.apk
-!/apk/Sweep-v0.5.0-release.apk.sha256

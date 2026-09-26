@@ -141,4 +141,22 @@ class FileDeleterTest {
         assertEquals(0, stopped.deletedCount)
         assertTrue(more.all { it.exists() })
     }
+
+    @Test
+    fun `the running recovered total only ever counts confirmed deletions`() {
+        val root = temp.newFolder()
+        val a = root.writeFile("a.bin", 3_000, seed = 1, ageDays = 1)
+        val ghost = File(root, "never-existed.bin")
+        val b = root.writeFile("b.bin", 5_000, seed = 2, ageDays = 1)
+
+        val reported = mutableListOf<Long>()
+        val outcome = FileDeleter.delete(listOf(item(a), item(ghost, size = 9_999, isDir = false), item(b)), onRecovered = { reported += it })
+
+        // One report per confirmed deletion, never for the missing file, and it ends where the
+        // outcome does.
+        assertEquals(2, reported.size)
+        assertEquals(outcome.bytesRecovered, reported.last())
+        assertEquals(8_000L, reported.last())
+        assertTrue(reported.zipWithNext().all { (x, y) -> y > x })
+    }
 }

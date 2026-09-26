@@ -133,6 +133,29 @@ object SafetyPolicy {
         return null
     }
 
+    /**
+     * Duplicate groups that [selected] would delete completely.
+     *
+     * The copy Sweep keeps is never pre-selected, and it has no select mark in the duplicates list.
+     * But when that same file also qualifies for another category, an old PDF in Downloads say, it
+     * stays selectable there by hand, so a user can still choose every copy. Selection is theirs to
+     * make; this is what lets the confirmation say so before it happens.
+     *
+     * Counted against the group's true size rather than the rows on screen, so a copy the user
+     * excluded from the results still counts as a survivor, which it is.
+     *
+     * @return the kept file's name for each group that would have no copy left
+     */
+    fun groupsLeftWithoutACopy(items: List<CleanupItem>, selected: Set<String>): List<String> {
+        val byGroup = items.filter { it.duplicate != null }.groupBy { it.duplicate!!.groupId }
+        return byGroup.values.mapNotNull { group ->
+            val info = group.first().duplicate!!
+            val copiesChosen = group.count { it.path in selected }
+            val keeperChosen = info.keeperPath in selected
+            if (keeperChosen && copiesChosen + 1 >= info.copiesInGroup) info.keeperName else null
+        }
+    }
+
     fun emptyFolderItem(dir: File): CleanupItem = CleanupItem(
         path = dir.absolutePath,
         name = dir.name,

@@ -9,7 +9,7 @@ import dev.sweep.core.model.Reason
 
 /**
  * All of the human-facing wording for a category lives here so the copy can be judged as a whole
- * rather than scattered across screens. Icons are one consistent outlined family.
+ * rather than scattered across screens.
  */
 val CleanupCategory.title: String
     get() = when (this) {
@@ -24,13 +24,13 @@ val CleanupCategory.title: String
 
 val CleanupCategory.blurb: String
     get() = when (this) {
-        CleanupCategory.DUPLICATES -> "Byte-identical copies. Sweep always keeps one."
-        CleanupCategory.INSTALLERS -> "APK files left behind after installing."
-        CleanupCategory.ARCHIVES -> "ZIP, RAR and 7z files, flagged when already extracted."
-        CleanupCategory.SCREENSHOTS -> "Screenshots you haven't touched in months."
-        CleanupCategory.DOWNLOADS -> "Files sitting in Downloads past your age threshold."
-        CleanupCategory.LARGE_FILES -> "Your biggest files. Shown for review, never pre-selected."
-        CleanupCategory.EMPTY_FOLDERS -> "Folders with nothing inside them."
+        CleanupCategory.DUPLICATES -> "Byte-identical copies of the same file. One copy of each is always kept."
+        CleanupCategory.INSTALLERS -> "APK files left behind after installing. Anything from the last week is left unselected."
+        CleanupCategory.ARCHIVES -> "ZIP, RAR and 7z files. Pre-selected only when an extracted folder of the same name sits beside one."
+        CleanupCategory.SCREENSHOTS -> "Screenshots past your age threshold. They are your pictures, so none are pre-selected."
+        CleanupCategory.DOWNLOADS -> "Files sitting in Downloads past your age threshold. Photos, videos and audio are never pre-selected."
+        CleanupCategory.LARGE_FILES -> "Your biggest files. Big is not the same as unwanted, so nothing here is pre-selected."
+        CleanupCategory.EMPTY_FOLDERS -> "Folders with nothing inside. Removing them tidies up but frees no space."
     }
 
 /** Shown when a category has no findings — each one is written for its own case. */

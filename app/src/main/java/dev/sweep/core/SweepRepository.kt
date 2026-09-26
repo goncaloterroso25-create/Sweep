@@ -56,9 +56,14 @@ class SweepRepository(private val context: Context) {
      */
     suspend fun delete(
         items: List<CleanupItem>,
-        onProgress: (done: Int, total: Int) -> Unit,
+        onProgress: (done: Int, total: Int, recoveredBytes: Long) -> Unit,
     ): DeletionOutcome = withContext(Dispatchers.IO) {
-        val outcome = FileDeleter.delete(items, onProgress)
+        var recovered = 0L
+        val outcome = FileDeleter.delete(
+            items = items,
+            onProgress = { done, total -> onProgress(done, total, recovered) },
+            onRecovered = { recovered = it },
+        )
         SystemFlows.notifyDeleted(context, outcome.deletedPaths)
         outcome
     }

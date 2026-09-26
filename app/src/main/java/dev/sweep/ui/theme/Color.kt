@@ -2,87 +2,102 @@ package dev.sweep.ui.theme
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
-import dev.sweep.core.model.CleanupCategory
 
 /**
- * Sweep's palette.
+ * Sweep's palette: ink, paper, and one signal.
  *
- * The base is a cool near-black in dark mode and warm paper in light mode — deliberately not
- * white-on-grey, which is what every other utility app looks like. One acid-lime signal colour
- * carries "space you get back"; it is used as a fill rather than as text so it never has to fight
- * for contrast, and large figures stay in the plain text colour in both themes.
+ * Colour has exactly two jobs in the app. Lime means "space you could get back": what a scan
+ * found, what is selected, the action that reviews it. Red means "this is permanent". Everything
+ * else, including every category, is drawn in the text colours, so a single lime mark on a screen
+ * always answers the same question.
+ *
+ * The two themes are designed separately rather than inverted. Lime is a fill in both, but on
+ * paper it is too pale to carry text or thin strokes, so light mode reads it through [signalInk],
+ * a deep olive from the same hue. Dark mode can use the lime itself.
  */
 @Immutable
 data class SweepColors(
+    /** The page. */
     val base: Color,
+    /** Grouped content that sits on the page: settings groups, the action tray. */
     val surface: Color,
-    val surfaceHigh: Color,
+    /** Sheets and anything that floats above a surface. */
+    val raised: Color,
+    /** Hairlines and resting outlines. */
     val line: Color,
+    /** Outlines that need to read as a control rather than a divider. */
+    val lineStrong: Color,
     val text: Color,
+    /** Metadata. Passes 4.5:1 on [base] and [surface] in both themes. */
     val textMute: Color,
+    /** Non-essential text only: footnotes, disabled labels. */
     val textFaint: Color,
-    val accent: Color,
-    val accentPressed: Color,
-    val onAccent: Color,
-    val accentSoft: Color,
+    /** The lime, as a fill. Always carries [onSignal] content. */
+    val signal: Color,
+    val onSignal: Color,
+    /** The lime as text or a thin stroke on [base]. Olive on paper, lime on ink. */
+    val signalInk: Color,
+    /** A barely-there wash behind selected rows. */
+    val signalWash: Color,
     val danger: Color,
-    val dangerSoft: Color,
-    val info: Color,
-    val glassFill: Color,
-    val glassHighlight: Color,
+    val onDanger: Color,
+    val dangerWash: Color,
+    /** Storage in use, as the tally draws it. */
+    val tallyUsed: Color,
+    /** Free storage, as the tally draws it: short, quiet stubs. */
+    val tallyFree: Color,
+    /** Found by a scan but not selected. */
+    val tallyFound: Color,
+    /** Selected, and confirmed-deleted stubs waiting for Android to re-measure. */
+    val tallySelected: Color,
+    val scrim: Color,
     val isDark: Boolean,
-) {
-    /**
-     * A restrained family used only as small marks: category icons and the ticks in the scan
-     * field. Never as a background fill, so the app never turns into a dashboard.
-     */
-    fun categoryTint(category: CleanupCategory): Color = when (category) {
-        CleanupCategory.DUPLICATES -> accent
-        CleanupCategory.INSTALLERS -> if (isDark) Color(0xFF7FA9FF) else Color(0xFF3663C8)
-        CleanupCategory.ARCHIVES -> if (isDark) Color(0xFFC49BFF) else Color(0xFF7C4CD1)
-        CleanupCategory.SCREENSHOTS -> if (isDark) Color(0xFF6FD9C4) else Color(0xFF177F6B)
-        CleanupCategory.DOWNLOADS -> if (isDark) Color(0xFFFFC24D) else Color(0xFFA9720B)
-        CleanupCategory.LARGE_FILES -> if (isDark) Color(0xFFFF8A65) else Color(0xFFC0552F)
-        CleanupCategory.EMPTY_FOLDERS -> textMute
-    }
-}
+)
 
 val DarkColors = SweepColors(
     base = Color(0xFF0B0E11),
-    surface = Color(0xFF151A1F),
-    surfaceHigh = Color(0xFF1E252C),
-    line = Color(0xFF2B343D),
-    text = Color(0xFFECEFF1),
-    textMute = Color(0xFF97A2AE),
-    textFaint = Color(0xFF5D6873),
-    accent = Color(0xFFC8F04B),
-    accentPressed = Color(0xFFAFD634),
-    onAccent = Color(0xFF10160A),
-    accentSoft = Color(0x1FC8F04B),
-    danger = Color(0xFFFF7A52),
-    dangerSoft = Color(0x1FFF7A52),
-    info = Color(0xFF8FB4FF),
-    glassFill = Color(0xCC161C22),
-    glassHighlight = Color(0x14FFFFFF),
+    surface = Color(0xFF13171B),
+    raised = Color(0xFF1A1F24),
+    line = Color(0xFF252C33),
+    lineStrong = Color(0xFF3A434C),
+    text = Color(0xFFEDEFF1),
+    textMute = Color(0xFF9AA3AD),
+    textFaint = Color(0xFF737D87),
+    signal = Color(0xFFC8F04B),
+    onSignal = Color(0xFF0E1405),
+    signalInk = Color(0xFFC8F04B),
+    signalWash = Color(0x12C8F04B),
+    danger = Color(0xFFFF6A4D),
+    onDanger = Color(0xFF1A0803),
+    dangerWash = Color(0x1AFF6A4D),
+    tallyUsed = Color(0xFFB9C0C7),
+    tallyFree = Color(0xFF2E363E),
+    tallyFound = Color(0xFF5F7428),
+    tallySelected = Color(0xFFC8F04B),
+    scrim = Color(0xB3050708),
     isDark = true,
 )
 
 val LightColors = SweepColors(
-    base = Color(0xFFEFEDE6),
-    surface = Color(0xFFFAF9F5),
-    surfaceHigh = Color(0xFFFFFFFF),
-    line = Color(0xFFDCD8CD),
-    text = Color(0xFF13181D),
-    textMute = Color(0xFF616B76),
-    textFaint = Color(0xFF9AA2AB),
-    accent = Color(0xFFB4DE2E),
-    accentPressed = Color(0xFF9AC21C),
-    onAccent = Color(0xFF10160A),
-    accentSoft = Color(0x33B4DE2E),
-    danger = Color(0xFFCF4620),
-    dangerSoft = Color(0x1FCF4620),
-    info = Color(0xFF2F5FD0),
-    glassFill = Color(0xE0FBFAF6),
-    glassHighlight = Color(0x66FFFFFF),
+    base = Color(0xFFF1EFE9),
+    surface = Color(0xFFFAF9F6),
+    raised = Color(0xFFFFFFFF),
+    line = Color(0xFFDEDAD0),
+    lineStrong = Color(0xFFBDB8AC),
+    text = Color(0xFF111518),
+    textMute = Color(0xFF56606A),
+    textFaint = Color(0xFF737C85),
+    signal = Color(0xFFC8F04B),
+    onSignal = Color(0xFF0E1405),
+    signalInk = Color(0xFF4A6400),
+    signalWash = Color(0x144A6400),
+    danger = Color(0xFFC23B1C),
+    onDanger = Color(0xFFFFFFFF),
+    dangerWash = Color(0x14C23B1C),
+    tallyUsed = Color(0xFF2A3036),
+    tallyFree = Color(0xFFD3CEC3),
+    tallyFound = Color(0xFF9DB05E),
+    tallySelected = Color(0xFF4A6400),
+    scrim = Color(0x80111518),
     isDark = false,
 )

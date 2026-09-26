@@ -70,27 +70,36 @@ object SweepNotifications {
         return NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    fun showCleanupReminder(context: Context, bytes: Long) {
+    /**
+     * Quotes the figure a real scan measured, and says when, because it is history: Sweep does not
+     * scan in the background, so it cannot claim to know what is on the phone today.
+     */
+    fun showCleanupReminder(context: Context, bytes: Long, scannedAt: Long) {
+        val day = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(scannedAt))
         notify(
             context = context,
             id = ID_CLEANUP,
             channel = CHANNEL_CLEANUP,
             title = "${ByteFormat.short(bytes)} worth reviewing",
-            body = "Sweep's last scan found files you may no longer need.",
+            body = "Found by your scan on $day. Nothing is deleted until you review it.",
             destination = null,
         )
     }
 
-    fun showUnusedAppsReminder(context: Context, appCount: Int, thresholdDays: Int) {
+    fun showUnusedAppsReminder(context: Context, appCount: Int, thresholdDays: Int, totalBytes: Long) {
         notify(
             context = context,
             id = ID_UNUSED_APPS,
             channel = CHANNEL_UNUSED_APPS,
-            title = "Haven't used these in a while",
-            body = if (appCount == 1) {
-                "1 app has been inactive for $thresholdDays+ days."
+            title = if (appCount == 1) {
+                "1 app not opened in $thresholdDays+ days"
             } else {
-                "$appCount apps have been inactive for $thresholdDays+ days."
+                "$appCount apps not opened in $thresholdDays+ days"
+            },
+            body = if (totalBytes > 0L) {
+                "Together they take up ${ByteFormat.short(totalBytes)}. Android handles any uninstall."
+            } else {
+                "Open Sweep to review them. Android handles any uninstall."
             },
             destination = DESTINATION_UNUSED_APPS,
         )

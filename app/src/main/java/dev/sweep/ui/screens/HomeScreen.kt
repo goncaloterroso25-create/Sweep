@@ -1,507 +1,713 @@
 package dev.sweep.ui.screens
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.sweep.core.android.SweepPermissions
 import dev.sweep.core.android.SystemFlows
-import dev.sweep.core.model.ByteFormat
+import dev.sweep.core.model.AgeFormat
+import dev.sweep.core.model.CategorySummary
 import dev.sweep.core.model.CleanupCategory
 import dev.sweep.core.model.ScanPhase
+import dev.sweep.ui.CleanupSummary
 import dev.sweep.ui.Stage
 import dev.sweep.ui.SweepUiState
-import dev.sweep.ui.components.AnimatedBytes
+import dev.sweep.ui.components.ActionTray
 import dev.sweep.ui.components.ButtonTone
-import dev.sweep.ui.components.CategoryCard
-import dev.sweep.ui.components.EmptyState
-import dev.sweep.ui.components.NoticeCard
-import dev.sweep.ui.components.RevealIn
-import dev.sweep.ui.components.SectionLabel
-import dev.sweep.ui.components.StorageMeter
+import dev.sweep.ui.components.ByteFigure
+import dev.sweep.ui.components.IconAction
+import dev.sweep.ui.components.LedgerRow
+import dev.sweep.ui.components.Notice
+import dev.sweep.ui.components.NoticeTone
+import dev.sweep.ui.components.SectionHeader
+import dev.sweep.ui.components.StorageTally
 import dev.sweep.ui.components.SweepButton
-import dev.sweep.ui.components.SweepTextButton
 import dev.sweep.ui.components.SweepWordmark
-import dev.sweep.ui.components.UtilityCard
-import dev.sweep.ui.components.pressable
-import dev.sweep.ui.components.rememberSweepPhase
-import dev.sweep.ui.components.sweepGlow
+import dev.sweep.ui.components.TallyFigures
+import dev.sweep.ui.components.TextAction
+import dev.sweep.ui.components.bytes
+import dev.sweep.ui.components.grouped
+import dev.sweep.ui.components.isCompact
+import dev.sweep.ui.components.plural
+import dev.sweep.ui.icon
+import dev.sweep.ui.theme.LocalReducedMotion
+import dev.sweep.ui.theme.MaxContentWidth
 import dev.sweep.ui.theme.Sweep
 import dev.sweep.ui.theme.SweepIcons
-import dev.sweep.ui.theme.sweepTween
+import dev.sweep.ui.theme.SweepMotion
+import dev.sweep.ui.theme.SweepType
+import dev.sweep.ui.theme.sweepReplace
+import dev.sweep.ui.title
 import java.io.File
-import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 /**
- * The whole product in one screen: understand, scan, see what was found, act.
+ * Home: how much space there is, whether anything is worth reviewing, and the one thing to do next.
  *
- * The hero figure has exactly one meaning and never changes it: this is how much free space the
- * device has right now. Scan figures live below the meter with their own heading, because a number
- * that means "free" in one state and "found" in another is a number nobody can trust.
+ * The hierarchy is fixed. Free space is the headline and only ever means free space. The tally
+ * under it is the same fact drawn, plus whatever a scan found. Then one panel that owns the
+ * primary action and changes in place as the session moves on: allow access, scan, scanning,
+ * results, deleting, receipt. What was found follows as a ledger, and apps come last, because
+ * they are a different job.
  */
 @Composable
 fun HomeScreen(
     state: SweepUiState,
     onScan: () -> Unit,
-    onCancelScan: () -> Unit,
-    onRescan: () -> Unit,
+    onStop: () -> Unit,
+    onPermissionsChanged: () -> Unit,
     onOpenCategory: (CleanupCategory) -> Unit,
-    onOpenApps: () -> Unit,
-    onOpenCache: () -> Unit,
+    onOpenApps: (cache: Boolean) -> Unit,
     onOpenSettings: () -> Unit,
+    onReview: () -> Unit,
+    onClearSelection: () -> Unit,
+    onDismissReceipt: () -> Unit,
+    onLoadApps: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val colors = Sweep.colors
-    val context = LocalContext.current
-    val scroll = rememberScrollState()
+    val stage = state.stage
 
-    Column(
-        modifier = modifier
+    LaunchedEffect(state.permissions.hasUsageAccess) {
+        if (state.permissions.hasUsageAccess) onLoadApps()
+    }
+    // Each scan discovers its categories afresh, so each one gets its entrance again.
+    LaunchedEffect(stage) { if (stage == Stage.SCANNING) seenThisProcess.clear() }
+
+    val findings: List<CategorySummary> = remember(state.result, state.progress, stage) {
+        val source = when (stage) {
+            Stage.SCANNING -> state.progress?.partial.orEmpty()
+            Stage.RESULTS, Stage.CLEANING, Stage.DONE -> state.result?.summaries().orEmpty()
+            Stage.IDLE -> emptyList()
+        }
+        val present = source.filterNot { it.isEmpty }
+        // While scanning, categories hold the order they were found in so rows do not jump under
+        // a moving scan. Once it resolves they sort by size, which is the order worth reading in.
+        if (stage == Stage.SCANNING) present else present.sortedByDescending { it.totalBytes }
+    }
+    val largest = findings.maxOfOrNull { it.totalBytes }?.coerceAtLeast(1L) ?: 1L
+
+    Box(
+        modifier
             .fillMaxSize()
             .background(colors.base)
-            .verticalScroll(scroll)
-            .statusBarsPadding()
-            .padding(horizontal = 20.dp),
     ) {
-        val scanning = state.stage == Stage.SCANNING
-        // One clock for the front, shared by the field and the light behind it, and only alive
-        // while a scan is running.
-        val phase = rememberSweepPhase(active = scanning)
-        // The mark acknowledges a scan starting, once, by redrawing its bars.
-        var scanCount by remember { mutableIntStateOf(0) }
-        LaunchedEffect(scanning) { if (scanning) scanCount++ }
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(bottom = 132.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            item(key = "header") {
+                Column(Modifier.column()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        SweepWordmark(Modifier.weight(1f))
+                        IconAction(SweepIcons.Settings, "Settings", onOpenSettings, tint = colors.textMute)
+                    }
+                }
+            }
 
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            SweepWordmark(modifier = Modifier.weight(1f), pulseKey = scanCount)
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .pressable(onClick = onOpenSettings),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    SweepIcons.Settings,
-                    contentDescription = "Settings",
-                    tint = colors.textMute,
-                    modifier = Modifier.size(21.dp),
+            item(key = "storage") {
+                Column(Modifier.column().padding(top = 26.dp)) {
+                    StorageHeadline(state)
+                    Spacer(Modifier.height(22.dp))
+                    StorageTally(
+                        figures = tallyFigures(state),
+                        scanning = stage == Stage.SCANNING,
+                        activity = state.scanPulse,
+                        description = tallyDescription(state),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    TallyLegend(state)
+                }
+            }
+
+            item(key = "panel") {
+                Box(Modifier.column().padding(top = 28.dp)) {
+                    StatusPanel(
+                        state = state,
+                        onScan = onScan,
+                        onStop = onStop,
+                        onPermissionsChanged = onPermissionsChanged,
+                        onDismissReceipt = onDismissReceipt,
+                    )
+                }
+            }
+
+            if (findings.isNotEmpty()) {
+                item(key = "found-header") {
+                    SectionHeader(
+                        text = if (stage == Stage.SCANNING) "Found so far" else "Found",
+                        modifier = Modifier
+                            .column()
+                            .padding(top = 30.dp)
+                            .animateItem(),
+                    )
+                }
+                items(findings, key = { "category:" + it.category.name }) { summary ->
+                    Arriving(key = summary.category, modifier = Modifier.animateItem()) {
+                        LedgerRow(
+                            title = summary.category.title,
+                            meta = categoryMeta(summary, state, stage),
+                            figure = summary.totalBytes.let { if (summary.category == CleanupCategory.EMPTY_FOLDERS) "-" else it.bytes() },
+                            icon = summary.category.icon,
+                            magnitude = summary.totalBytes.toFloat() / largest,
+                            selectedShare = if (summary.totalBytes > 0L) {
+                                (state.selection.bytesByCategory[summary.category] ?: 0L).toFloat() / summary.totalBytes
+                            } else {
+                                0f
+                            },
+                            enabled = stage == Stage.RESULTS || stage == Stage.DONE,
+                            onClick = { onOpenCategory(summary.category) },
+                            modifier = Modifier.column(),
+                        )
+                    }
+                }
+            }
+
+            item(key = "apps-header") {
+                SectionHeader(
+                    text = "Apps",
+                    modifier = Modifier
+                        .column()
+                        .padding(top = 30.dp)
+                        .animateItem(),
+                )
+            }
+            item(key = "apps-unused") {
+                LedgerRow(
+                    title = "Unused apps",
+                    meta = unusedAppsMeta(state),
+                    figure = state.apps
+                        ?.takeIf { it.hasUsageAccess && it.reclaimableBytes > 0 }
+                        ?.reclaimableBytes?.bytes().orEmpty(),
+                    icon = SweepIcons.Apps,
+                    onClick = { onOpenApps(false) },
+                    modifier = Modifier
+                        .column()
+                        .animateItem(),
+                )
+            }
+            item(key = "apps-cache") {
+                LedgerRow(
+                    title = "App caches",
+                    meta = cacheMeta(state),
+                    figure = state.apps
+                        ?.takeIf { it.hasUsageAccess && it.totalCacheBytes > 0 }
+                        ?.totalCacheBytes?.bytes().orEmpty(),
+                    icon = SweepIcons.Cache,
+                    onClick = { onOpenApps(true) },
+                    showDivider = false,
+                    modifier = Modifier
+                        .column()
+                        .animateItem(),
                 )
             }
         }
 
-        Spacer(Modifier.height(26.dp))
-
-        // Hero and field share one surface so the light behind the front reaches both.
-        Column(Modifier.sweepGlow(phase = phase, active = scanning)) {
-            FreeSpaceHero(state)
-            Spacer(Modifier.height(20.dp))
-            StorageMeter(
-                usedFraction = state.storage.usedFraction,
-                reclaimFraction = meterReclaimFraction(state),
-                scanPhase = phase.takeIf { scanning },
-                contentDescription = meterDescription(state),
-            )
-            Spacer(Modifier.height(12.dp))
-            MeterLegend(state)
-        }
-
-        Spacer(Modifier.height(20.dp))
-        ScanPanel(
-            state = state,
-            onScan = onScan,
-            onCancelScan = onCancelScan,
-            onRescan = onRescan,
+        ActionTray(
+            visible = stage == Stage.RESULTS && state.selection.count > 0,
+            count = state.selection.count,
+            bytes = state.selection.bytes,
+            onClear = onClearSelection,
+            onReview = onReview,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
-
-        if (!state.permissions.canScanFiles) {
-            Spacer(Modifier.height(22.dp))
-            NoticeCard(
-                title = "Storage access",
-                body = "Needed to find duplicates, old downloads and other files worth removing. " +
-                    "Nothing leaves the device.",
-                icon = SweepIcons.Lock,
-                tint = colors.accent,
-                action = {
-                    SweepButton(
-                        text = "Allow storage access",
-                        onClick = {
-                            SystemFlows.launchFirstAvailable(
-                                context,
-                                SweepPermissions.fileAccessIntents(context),
-                            )
-                        },
-                    )
-                },
-            )
-        }
-
-        val summaries = state.result?.summaries()?.filterNot { it.isEmpty }.orEmpty()
-        val showEmptyState = state.stage == Stage.RESULTS && summaries.isEmpty()
-
-        if (summaries.isNotEmpty() || state.stage == Stage.SCANNING) {
-            Spacer(Modifier.height(28.dp))
-            SectionLabel(if (state.stage == Stage.SCANNING) "Found so far" else "What Sweep found")
-            Spacer(Modifier.height(12.dp))
-
-            val live = if (state.stage == Stage.SCANNING) {
-                state.progress?.partial?.filterNot { it.isEmpty }.orEmpty()
-            } else {
-                summaries
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                live.forEachIndexed { index, summary ->
-                    // Keyed so a category keeps its identity as the scan reshuffles the list.
-                    // That is also what stops a card re-animating every time its count ticks up:
-                    // the reveal runs once, when the category is first discovered.
-                    androidx.compose.runtime.key(summary.category) {
-                        RevealIn(index = index) {
-                            CategoryCard(
-                                summary = summary,
-                                onClick = { onOpenCategory(summary.category) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showEmptyState) {
-            Spacer(Modifier.height(16.dp))
-            EmptyState(
-                title = "Nothing obvious to clear",
-                body = "Sweep looked through ${state.result?.filesScanned.orZero().formatted()} " +
-                    "files and found nothing worth removing.",
-            )
-        }
-
-        Spacer(Modifier.height(28.dp))
-        SectionLabel("Apps")
-        Spacer(Modifier.height(12.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            UtilityCard(
-                title = "Unused apps",
-                subtitle = appsSubtitle(state),
-                trailing = state.apps
-                    ?.takeIf { it.hasUsageAccess && it.reclaimableBytes > 0 }
-                    ?.let { ByteFormat.short(it.reclaimableBytes) },
-                icon = SweepIcons.Apps,
-                tint = colors.info,
-                onClick = onOpenApps,
-            )
-            UtilityCard(
-                title = "App caches",
-                subtitle = cacheSubtitle(state),
-                trailing = state.apps?.totalCacheBytes
-                    ?.takeIf { it > 0 }
-                    ?.let { ByteFormat.short(it) },
-                icon = SweepIcons.Cache,
-                tint = colors.categoryTint(CleanupCategory.SCREENSHOTS),
-                onClick = onOpenCache,
-            )
-        }
-
-        Spacer(Modifier.height(120.dp))
-        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
-/**
- * Free space, always. This figure is read at a glance and acted on, so it is never reused to
- * carry a scan total — the one change that makes the rest of the screen believable.
- */
+/** Every block on Home shares one column: 20dp gutters, and a reading width on large screens. */
+private fun Modifier.column(): Modifier = this
+    .widthIn(max = MaxContentWidth)
+    .fillMaxWidth()
+    .padding(horizontal = 20.dp)
+
 @Composable
-private fun FreeSpaceHero(state: SweepUiState) {
+private fun StorageHeadline(state: SweepUiState) {
     val colors = Sweep.colors
     val storage = state.storage
-
     Column {
-        SectionLabel("Storage")
-        Spacer(Modifier.height(10.dp))
-        AnimatedBytes(bytes = storage.freeBytes, suffix = "free")
-        Spacer(Modifier.height(7.dp))
+        ByteFigure(bytes = storage.freeBytes, spokenSuffix = "free")
+        Spacer(Modifier.height(8.dp))
         Text(
-            text = if (storage.totalBytes > 0) {
-                "of ${ByteFormat.short(storage.totalBytes)} · " +
-                    "${ByteFormat.short(storage.usedBytes)} used"
+            text = if (storage.totalBytes > 0L) {
+                "free of ${storage.totalBytes.bytes()} · ${storage.usedBytes.bytes()} used"
             } else {
-                state.scanRootLabel.ifBlank { "Storage size unavailable" }
+                "Android did not report this device's storage size"
             },
-            // Deliberately heavier than body copy: this line is half of the storage picture.
-            style = MaterialTheme.typography.titleSmall,
+            style = SweepType.meta.copy(fontSize = SweepType.body.fontSize),
             color = colors.textMute,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
         )
+        if (storage.hasExtraVolumes) {
+            Spacer(Modifier.height(2.dp))
+            Text(
+                text = "Internal storage. Removable storage is scanned too.",
+                style = SweepType.meta,
+                color = colors.textMute,
+            )
+        }
     }
 }
 
-/**
- * Says what the block field is showing right now. Without it the accent blocks mean three
- * different things across the app's states and the user has to infer which one is in play.
- */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MeterLegend(state: SweepUiState) {
+private fun TallyLegend(state: SweepUiState) {
     val colors = Sweep.colors
     if (state.storage.totalBytes <= 0L) return
-
-    val accentLabel = when (state.stage) {
-        Stage.SCANNING -> "Found so far"
-        Stage.RESULTS, Stage.CLEANING, Stage.DONE ->
-            if (state.selectedCount > 0) "Selected to remove" else null
-        else -> null
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val figures = tallyFigures(state)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        LegendKey(colors.textMute.copy(alpha = 0.38f), "Used", filled = true)
-        LegendKey(colors.line, "Free", filled = false)
-        if (accentLabel != null) LegendKey(colors.accent, accentLabel, filled = true)
+        LegendKey(colors.tallyUsed, 1f, "Used")
+        if (figures.foundFraction > 0f) LegendKey(colors.tallyFound, 1f, "For review")
+        if (figures.selectedFraction > 0f) LegendKey(colors.tallySelected, 1f, "Selected")
+        LegendKey(colors.tallyFree, 0.45f, "Free")
     }
 }
 
 @Composable
-private fun LegendKey(color: Color, label: String, filled: Boolean) {
-    val colors = Sweep.colors
+private fun LegendKey(color: Color, height: Float, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(RoundedCornerShape(2.5.dp))
-                .then(
-                    if (filled) Modifier.background(color)
-                    else Modifier.border(1.dp, color, RoundedCornerShape(2.5.dp))
-                )
-        )
+        Canvas(Modifier.size(width = 3.dp, height = 12.dp)) {
+            val stroke = size.width
+            drawLine(
+                color = color,
+                start = Offset(stroke / 2f, size.height - stroke / 2f),
+                end = Offset(stroke / 2f, size.height - stroke / 2f - (size.height - stroke) * height),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round,
+            )
+        }
         Spacer(Modifier.width(6.dp))
-        Text(label, style = MaterialTheme.typography.labelMedium, color = colors.textFaint)
+        Text(label, style = SweepType.micro, color = Sweep.colors.textMute)
+    }
+}
+
+private enum class Panel { NO_ACCESS, IDLE, SCANNING, RESULTS, CLEANING, RECEIPT }
+
+private fun SweepUiState.panel(): Panel = when {
+    stage == Stage.SCANNING -> Panel.SCANNING
+    stage == Stage.CLEANING -> Panel.CLEANING
+    stage == Stage.DONE && cleanup != null -> Panel.RECEIPT
+    stage == Stage.RESULTS -> Panel.RESULTS
+    !permissions.canScanFiles -> Panel.NO_ACCESS
+    else -> Panel.IDLE
+}
+
+/**
+ * One panel, six states. Each state replaces the last in place along the sweep axis, so the
+ * session reads as one thing progressing rather than blocks swapping.
+ */
+@Composable
+private fun StatusPanel(
+    state: SweepUiState,
+    onScan: () -> Unit,
+    onStop: () -> Unit,
+    onPermissionsChanged: () -> Unit,
+    onDismissReceipt: () -> Unit,
+) {
+    val reduced = LocalReducedMotion.current
+    val shift = with(LocalDensity.current) { SweepMotion.SHIFT_DP.dp.roundToPx() }
+    AnimatedContent(
+        targetState = state.panel(),
+        transitionSpec = { sweepReplace(reduced, shift) using SizeTransform(clip = false) },
+        label = "panel",
+    ) { panel ->
+        when (panel) {
+            Panel.NO_ACCESS -> AccessPanel(onPermissionsChanged)
+            Panel.IDLE -> IdlePanel(state, onScan)
+            Panel.SCANNING -> ScanningPanel(state, onStop)
+            Panel.RESULTS -> ResultsPanel(state, onScan)
+            Panel.CLEANING -> CleaningPanel(state)
+            Panel.RECEIPT -> state.cleanup?.let { ReceiptPanel(it, onDismissReceipt) } ?: Spacer(Modifier)
+        }
     }
 }
 
 /**
- * Everything about the scan itself: the action that starts it, the live figures while it runs,
- * and what it found once it is done. Kept as one block so the state change reads as one thing
- * updating rather than the screen rearranging.
+ * Asked for at the moment its value is obvious, which is the moment someone wants to scan. There
+ * is no onboarding wall: Sweep opens straight to Home, with this in place of the scan button.
  */
 @Composable
-private fun ScanPanel(
-    state: SweepUiState,
-    onScan: () -> Unit,
-    onCancelScan: () -> Unit,
-    onRescan: () -> Unit,
-) {
+private fun AccessPanel(onPermissionsChanged: () -> Unit) {
     val colors = Sweep.colors
+    val context = LocalContext.current
+    val runtimePrompt = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { onPermissionsChanged() }
 
-    // Scanning, results and the idle action are three phases of one panel, so they cross-dissolve
-    // in place instead of the screen swapping one block for another. Grouped so that cleaning and
-    // completing do not re-run the transition.
-    val phase = when (state.stage) {
-        Stage.SCANNING -> ScanPanelPhase.SCANNING
-        Stage.RESULTS, Stage.CLEANING, Stage.DONE -> ScanPanelPhase.RESULTS
-        else -> ScanPanelPhase.IDLE
+    Column {
+        Text("Let Sweep look through your storage", style = SweepType.headline, color = colors.text)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "Finding duplicates, old downloads and forgotten installers needs access to " +
+                "your files. Sweep reads them on this phone only, and nothing is deleted until " +
+                "you have reviewed it.",
+            style = SweepType.body,
+            color = colors.textMute,
+        )
+        Spacer(Modifier.height(18.dp))
+        SweepButton(
+            text = "Allow storage access",
+            icon = SweepIcons.Lock,
+            onClick = {
+                if (SweepPermissions.usesRuntimeStoragePrompt) {
+                    runtimePrompt.launch(SweepPermissions.runtimeStoragePermissions)
+                } else {
+                    SystemFlows.launchFirstAvailable(context, SweepPermissions.fileAccessIntents(context))
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = if (SweepPermissions.usesRuntimeStoragePrompt) {
+                "Android will ask you to confirm."
+            } else {
+                "Android opens its All files access page. Turn Sweep on there, then come back."
+            },
+            style = SweepType.meta,
+            color = colors.textMute,
+        )
     }
+}
 
-    // Hoisted: transitionSpec is not a composable scope, so the specs are built out here.
-    val arriveFade = sweepTween<Float>(240, delayMillis = 90)
-    val arriveSlide = sweepTween<IntOffset>(320, delayMillis = 90)
-    val leaveFade = sweepTween<Float>(140)
-    val resize = sweepTween<IntSize>(260)
+@Composable
+private fun IdlePanel(state: SweepUiState, onScan: () -> Unit) {
+    val colors = Sweep.colors
+    Column {
+        SweepButton(
+            text = "Scan storage",
+            icon = SweepIcons.Scan,
+            onClick = onScan,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(12.dp))
+        val last = state.lastScan
+        Text(
+            text = if (last != null) {
+                "Your last scan found ${last.foundBytes.bytes()} worth reviewing, ${ago(last.at)}. " +
+                    "Scan again to see what is there now."
+            } else {
+                "Looks for duplicates, old downloads, installers, archives and more. Nothing is " +
+                    "deleted until you review it."
+            },
+            style = SweepType.meta,
+            color = colors.textMute,
+        )
+    }
+}
 
-    AnimatedContent(
-        targetState = phase,
-        transitionSpec = {
-            (fadeIn(arriveFade) + slideInHorizontally(arriveSlide) { it / 12 })
-                .togetherWith(fadeOut(leaveFade))
-        },
-        modifier = Modifier.animateContentSize(animationSpec = resize),
-        label = "scanPanel",
-    ) { current ->
-        when (current) {
-            ScanPanelPhase.SCANNING -> {
-                val progress = state.progress
-                val found = progress?.partial?.sumOf { it.totalBytes } ?: 0L
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = "Scanning your storage",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.text,
-                        )
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            text = buildString {
-                                append("${progress?.filesSeen.orZero().formatted()} files checked")
-                                scanLocation(state)?.let { append(" · in $it") }
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.textMute,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "${ByteFormat.short(found)} found for review",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.accent,
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    SweepButton(text = "Stop", onClick = onCancelScan, tone = ButtonTone.Neutral)
-                }
+@Composable
+private fun ScanningPanel(state: SweepUiState, onStop: () -> Unit) {
+    val colors = Sweep.colors
+    val progress = state.progress
+    val found = progress?.partial?.sumOf { it.totalBytes } ?: 0L
+    val readout: @Composable (Modifier) -> Unit = { readoutModifier ->
+        Column(readoutModifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+            Text("Scanning", style = SweepType.headline, color = colors.text)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = "${(progress?.filesSeen ?: 0).grouped()} files checked",
+                style = SweepType.meta.copy(fontSize = SweepType.body.fontSize),
+                color = colors.text,
+            )
+            Text(
+                text = "${found.bytes()} found for review",
+                style = SweepType.meta.copy(fontSize = SweepType.body.fontSize),
+                color = colors.signalInk,
+            )
+            scanLocation(state)?.let {
+                Spacer(Modifier.height(2.dp))
+                Text(it, style = SweepType.meta, color = colors.textMute, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-
-            ScanPanelPhase.RESULTS -> {
-                val result = state.result
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // With no findings the empty state below says everything worth saying, so
-                    // the panel gets out of its way and offers only the action.
-                    if (result != null && result.items.isNotEmpty()) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = "${ByteFormat.short(result.totalFoundBytes)} found for review",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.text,
-                            )
-                            Spacer(Modifier.height(3.dp))
-                            Text(
-                                text = buildString {
-                                    append("across ${result.items.size.formatted()} files")
-                                    append(" · ${result.filesScanned.formatted()} checked")
-                                    if (state.scanWasCancelled) append(" · stopped early, partial")
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.textMute,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    SweepTextButton(
-                        text = "Scan again",
-                        onClick = onRescan,
-                        icon = SweepIcons.Rescan,
-                    )
-                }
+        }
+    }
+    BoxWithConstraints {
+        if (isCompact(maxWidth)) {
+            Column {
+                readout(Modifier)
+                Spacer(Modifier.height(12.dp))
+                SweepButton("Stop", onClick = onStop, tone = ButtonTone.Secondary, compact = true)
             }
-
-            ScanPanelPhase.IDLE -> {
-                SweepButton(
-                    text = "Scan storage",
-                    onClick = onScan,
-                    enabled = state.permissions.canScanFiles,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+        } else {
+            Row(verticalAlignment = Alignment.Top) {
+                readout(Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
+                SweepButton("Stop", onClick = onStop, tone = ButtonTone.Secondary, compact = true)
             }
         }
     }
 }
 
-private enum class ScanPanelPhase { IDLE, SCANNING, RESULTS }
+@Composable
+private fun ResultsPanel(state: SweepUiState, onScan: () -> Unit) {
+    val colors = Sweep.colors
+    val result = state.result ?: return
+    Column {
+        Text(
+            text = if (result.items.isEmpty()) "Nothing worth reviewing"
+            else "${result.totalFoundBytes.bytes()} worth reviewing",
+            style = SweepType.headline,
+            color = colors.text,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = if (result.items.isEmpty()) {
+                "Sweep checked ${result.filesScanned.grouped()} files and found nothing it " +
+                    "would suggest removing."
+            } else {
+                "${plural(result.items.size, "file")} across ${plural(result.byCategory.size, "category", "categories")}. " +
+                    "${result.filesScanned.grouped()} checked."
+            },
+            style = SweepType.meta,
+            color = colors.textMute,
+        )
+        if (result.stoppedEarly) {
+            Text("Stopped early, so this is part of the picture.", style = SweepType.meta, color = colors.textMute)
+        }
+        if (result.unreadableDirectories > 0) {
+            Text(
+                text = "${plural(result.unreadableDirectories, "folder")} could not be read.",
+                style = SweepType.meta,
+                color = colors.textMute,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        // Aligned to the text above rather than to the text action's own padding.
+        TextAction("Scan again", onClick = onScan, icon = SweepIcons.Scan, modifier = Modifier.offset(x = (-12).dp))
+    }
+}
+
+@Composable
+private fun CleaningPanel(state: SweepUiState) {
+    val colors = Sweep.colors
+    val cleaning = state.cleaning ?: return
+    Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+        Text("Deleting", style = SweepType.headline, color = colors.text)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = "${cleaning.done.grouped()} of ${plural(cleaning.total, "file")}",
+            style = SweepType.meta.copy(fontSize = SweepType.body.fontSize),
+            color = colors.text,
+        )
+        Text(
+            text = "${cleaning.recoveredBytes.bytes()} confirmed gone so far",
+            style = SweepType.meta.copy(fontSize = SweepType.body.fontSize),
+            color = colors.signalInk,
+        )
+    }
+}
 
 /**
- * Where the walk currently is, when that is something worth saying. During hashing there is no
- * meaningful location, so the phase is named instead of showing a stale folder.
+ * What actually happened. The large figure is bytes the deleter confirmed gone; the free-space
+ * line is Android's own measurement taken afterwards. Failures are listed, never absorbed.
  */
+@Composable
+private fun ReceiptPanel(summary: CleanupSummary, onDone: () -> Unit) {
+    val colors = Sweep.colors
+    Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
+        when {
+            summary.filesRemoved > 0 && summary.bytesRecovered > 0L -> {
+                Text("Freed", style = SweepType.label, color = colors.textMute)
+                Spacer(Modifier.height(2.dp))
+                ByteFigure(
+                    bytes = summary.bytesRecovered,
+                    valueStyle = SweepType.figure,
+                    unitStyle = SweepType.headline,
+                    valueColor = colors.signalInk,
+                    animate = false,
+                )
+            }
+            summary.filesRemoved > 0 -> Text("Tidied up", style = SweepType.headline, color = colors.text)
+            else -> Text("Nothing was deleted", style = SweepType.headline, color = colors.text)
+        }
+        Spacer(Modifier.height(8.dp))
+        val lines = buildList {
+            if (summary.filesRemoved > 0) {
+                add(
+                    "${plural(summary.filesRemoved, "item")} deleted from " +
+                        summary.categories.joinToString(", ") { it.title.lowercase() } + "."
+                )
+            }
+            if (summary.filesRemoved > 0 && summary.bytesRecovered == 0L) {
+                add("They were empty folders, so there was no space to reclaim.")
+            }
+            if (summary.freeBytesAfter > 0L) add("Android now reports ${summary.freeBytesAfter.bytes()} free.")
+            if (summary.alreadyGone == 1) {
+                add("1 file had already gone before Sweep reached it, so it is not counted.")
+            } else if (summary.alreadyGone > 1) {
+                add("${summary.alreadyGone.grouped()} files had already gone before Sweep reached them, so they are not counted.")
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            lines.forEach { Text(it, style = SweepType.meta, color = colors.textMute) }
+        }
+
+        if (summary.failed.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            val reasons = summary.failed.map { it.reason }.distinct().take(2).joinToString(" ") { "$it." }
+            Notice(
+                title = "${plural(summary.failed.size, "item")} could not be deleted",
+                text = "${summary.failed.sumOf { it.size }.bytes()} is still on the device and is not counted above. $reasons",
+                icon = SweepIcons.Warning,
+                tone = NoticeTone.Danger,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        SweepButton("Done", onClick = onDone, tone = ButtonTone.Secondary, compact = true)
+    }
+}
+
+/**
+ * A category arriving mid-scan sweeps in from the left, once. A category that is already on
+ * screen does not re-animate when its figure grows, and one scrolled back into view does not
+ * replay its entrance.
+ */
+@Composable
+private fun Arriving(key: CleanupCategory, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val reduced = LocalReducedMotion.current
+    val shift = with(LocalDensity.current) { SweepMotion.SHIFT_DP.dp.toPx() }
+    val progress = remember(key) { Animatable(if (reduced || key in seenThisProcess) 1f else 0f) }
+    LaunchedEffect(key) {
+        seenThisProcess += key
+        if (progress.value < 1f) {
+            progress.animateTo(1f, spring(dampingRatio = 0.86f, stiffness = 380f))
+        }
+    }
+    Box(
+        modifier.graphicsLayer {
+            alpha = progress.value.coerceIn(0f, 1f)
+            translationX = (1f - progress.value) * -shift
+        }
+    ) { content() }
+}
+
+/** Categories that have already made their entrance, so a scrolled-away row returns quietly. */
+private val seenThisProcess = HashSet<CleanupCategory>()
+
+private fun tallyFigures(state: SweepUiState): TallyFigures {
+    val total = state.storage.totalBytes.toFloat()
+    if (total <= 0f) return TallyFigures(0f)
+    val found = when (state.stage) {
+        Stage.SCANNING -> state.progress?.partial?.sumOf { it.totalBytes } ?: 0L
+        Stage.IDLE -> 0L
+        else -> state.result?.totalFoundBytes ?: 0L
+    }
+    val selected = if (state.stage == Stage.RESULTS || state.stage == Stage.CLEANING) state.selection.bytes else 0L
+    val cleared = state.cleaning?.recoveredBytes ?: 0L
+    return TallyFigures(
+        usedFraction = state.storage.usedFraction,
+        foundFraction = found / total,
+        selectedFraction = selected / total,
+        clearedFraction = cleared / total,
+    )
+}
+
+private fun tallyDescription(state: SweepUiState): String {
+    val storage = state.storage
+    if (storage.totalBytes <= 0L) return "Storage size unavailable"
+    val figures = tallyFigures(state)
+    return buildString {
+        append("${storage.usedBytes.bytes()} used and ${storage.freeBytes.bytes()} free of ${storage.totalBytes.bytes()}.")
+        if (figures.foundFraction > 0f) append(" ${state.result?.totalFoundBytes?.bytes() ?: ""} found for review.")
+        if (state.selection.bytes > 0L && state.stage == Stage.RESULTS) append(" ${state.selection.bytes.bytes()} selected.")
+    }
+}
+
+private fun categoryMeta(summary: CategorySummary, state: SweepUiState, stage: Stage): String {
+    val noun = if (summary.category == CleanupCategory.EMPTY_FOLDERS) "folder" else "file"
+    val items = plural(summary.itemCount, noun)
+    if (stage == Stage.SCANNING) return items
+    val selected = state.selection.countByCategory[summary.category] ?: 0
+    return when {
+        selected > 0 -> "$items · ${selected.grouped()} selected"
+        summary.suggestedCount == 0 -> "$items · review one by one"
+        else -> "$items · none selected"
+    }
+}
+
 private fun scanLocation(state: SweepUiState): String? {
     val progress = state.progress ?: return null
     return when (progress.phase) {
-        ScanPhase.HASHING -> "comparing for duplicates"
-        ScanPhase.FINISHING -> "finishing up"
+        ScanPhase.HASHING -> "Comparing files to find exact duplicates"
+        ScanPhase.FINISHING -> "Finishing up"
         ScanPhase.WALKING -> progress.currentDirectory
             ?.let { File(it).name }
-            ?.takeIf { it.isNotBlank() }
+            ?.takeIf { it.isNotBlank() && it != "0" }
+            ?.let { "In $it" }
     }
 }
 
-private fun meterReclaimFraction(state: SweepUiState): Float {
-    val total = state.storage.totalBytes
-    if (total <= 0L) return 0f
-    val bytes = when (state.stage) {
-        // While scanning the accent blocks are "found so far", which is what the panel above
-        // reports. Afterwards they track the live selection, so choosing more files visibly
-        // grows the space that is about to come back. The legend names whichever is in play.
-        Stage.SCANNING -> state.progress?.partial?.sumOf { it.totalBytes } ?: 0L
-        // Deleting drains the accent region as the files actually go. This follows real progress
-        // through the selection, not a guess at the outcome: the free-space figure above only
-        // moves once Android has been asked again.
-        Stage.CLEANING -> (state.selectedBytes * (1f - state.deleteProgress)).toLong()
-        Stage.RESULTS, Stage.DONE -> state.selectedBytes
-        else -> 0L
-    }
-    return (bytes.toFloat() / total).coerceIn(0f, 1f)
-}
-
-private fun meterDescription(state: SweepUiState): String {
-    val storage = state.storage
-    if (storage.totalBytes <= 0L) return "Storage usage unavailable"
-    return "${ByteFormat.short(storage.usedBytes)} used of " +
-        "${ByteFormat.short(storage.totalBytes)}, " +
-        "${ByteFormat.short(storage.freeBytes)} free"
-}
-
-private fun appsSubtitle(state: SweepUiState): String {
+private fun unusedAppsMeta(state: SweepUiState): String {
     val apps = state.apps
     return when {
         !state.permissions.hasUsageAccess -> "Needs Usage Access to see when apps were last opened"
-        apps == null -> "Check which apps you've stopped opening"
-        apps.unused.isEmpty() && apps.unknownUsage.isNotEmpty() ->
-            "Nothing confirmed unused · ${apps.unknownUsage.size} with no usage history"
-        apps.unused.isEmpty() -> "Nothing unused in the last ${apps.thresholdDays} days"
-        apps.unused.size == 1 -> "1 app unused for ${apps.thresholdDays}+ days"
-        else -> "${apps.unused.size} apps unused for ${apps.thresholdDays}+ days"
+        apps == null -> "Checking when your apps were last opened"
+        apps.unused.isNotEmpty() -> "${plural(apps.unused.size, "app")} not opened in ${apps.thresholdDays}+ days"
+        !apps.hasAnyUsageHistory -> "Android has not shared usage history on this device"
+        else -> "Nothing unopened for ${apps.thresholdDays} days"
     }
 }
 
-private fun cacheSubtitle(state: SweepUiState): String = when {
+private fun cacheMeta(state: SweepUiState): String = when {
     !state.permissions.hasUsageAccess -> "Needs Usage Access to measure cached data"
-    state.apps == null -> "See what apps are caching"
-    else -> "Sweep shows the sizes, Android does the clearing"
+    state.apps == null -> "Measuring what apps have cached"
+    else -> "Measured by Sweep, cleared by Android"
 }
 
-private fun Int?.orZero(): Int = this ?: 0
-
-private fun Int.formatted(): String = String.format(Locale.getDefault(), "%,d", this)
+private fun ago(at: Long): String {
+    val days = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - at).toInt()
+    return AgeFormat.describe(days)
+}

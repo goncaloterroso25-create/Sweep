@@ -7,7 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-val appVersionName = "0.5.0"
+val appVersionName = "0.6.0"
 
 /**
  * Release signing details, read from `keystore.properties` at the project root or from the
@@ -37,7 +37,7 @@ val canSignRelease = releaseKeystore != null &&
     releaseKeyAlias != null &&
     releaseKeyPassword != null
 
-// Produces Sweep-v0.5.0-release.apk rather than app-release.apk, so a tester can tell at a
+// Produces Sweep-v0.6.0-release.apk rather than app-release.apk, so a tester can tell at a
 // glance which build they were sent.
 base {
     archivesName.set("Sweep-v$appVersionName")
@@ -51,7 +51,7 @@ android {
         applicationId = "dev.sweep"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = appVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -100,6 +100,17 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        // Robolectric needs the merged resources to render Compose screens in layout tests.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            // `./gradlew testDebugUnitTest -Psweep.shots` also writes each layout test's screens
+            // to app/build/shots/ as PNGs. Without it the layouts are still checked, just not saved.
+            it.systemProperty("sweep.shots", project.hasProperty("sweep.shots").toString())
+            it.systemProperty("roborazzi.test.record", project.hasProperty("sweep.shots").toString())
+        }
     }
 
     packaging {
@@ -182,14 +193,23 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.coil.compose)
     implementation(libs.androidx.work.runtime)
+    implementation(libs.androidx.core.splashscreen)
 
     debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    // Renders the real Compose screens on the JVM, so layouts can be checked at 320dp, at large
+    // font scales and in both themes without a device. Test classpath only: nothing here ships.
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.roborazzi)
+    testImplementation(libs.roborazzi.compose)
 }

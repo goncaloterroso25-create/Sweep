@@ -18,6 +18,8 @@ object FileDeleter {
         items: List<CleanupItem>,
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
         isActive: () -> Boolean = { true },
+        /** Called after each confirmed deletion with the running total of bytes actually recovered. */
+        onRecovered: (bytesSoFar: Long) -> Unit = {},
     ): DeletionOutcome {
         val deleted = ArrayList<String>(items.size)
         val failed = ArrayList<FailedDeletion>()
@@ -49,6 +51,7 @@ object FileDeleter {
             if (removed && !file.exists()) {
                 deleted += item.path
                 recovered += sizeNow
+                onRecovered(recovered)
             } else {
                 failed += FailedDeletion(
                     path = item.path,

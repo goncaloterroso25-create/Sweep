@@ -9,6 +9,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dev.sweep.SweepApplication
+import dev.sweep.core.data.ReminderPolicy
 import dev.sweep.core.data.ReminderState
 import java.util.concurrent.TimeUnit
 
@@ -41,15 +42,14 @@ class ReminderWorker(
             return Result.success()
         }
         if (!SweepNotifications.canNotify(applicationContext)) return Result.success()
-
-        // One reminder at a time, and never two in the same week.
-        if (now - state.lastNotifiedAt < COOLDOWN_MS) return Result.success()
+        if (!ReminderPolicy.mayNotify(state, now)) return Result.success()
 
         if (settings.unusedAppReminders && remindAboutUnusedApps(settings, state, now)) {
             return Result.success()
         }
-        if (settings.cleanupReminders) {
-            remindAboutCleanup(settings, state, now)
+        if (settings.cleanupReminders && ReminderPolicy.shouldRemindAboutCleanup(state, settings.reminderThresholdBytes, now)) {
+            SweepNotifications.showCleanupReminder(applicationContext, state.lastScanFoundBytes, state.lastScanAt)
+            app.settings.recordReminderSent(now, notifiedBytes = state.lastScanFoundBytes)
         }
         return Result.success()
     }
@@ -71,37 +71,24 @@ class ReminderWorker(
         }.getOrNull() ?: return false
 
         val count = result.unused.size
-        if (count == 0) return false
-        // Nothing changed since last time, so there is nothing new to say.
-        if (count == state.lastUnusedAppCount) return false
+        if (!ReminderPolicy.shouldRemindAboutUnusedApps(state, count)) {
+            // Remember a fall too, so the next rise is measured from here rather than from a peak.
+            if (count != state.lastUnusedAppCount) app.settings.recordUnusedAppCount(count)
+            return false
+        }
 
         SweepNotifications.showUnusedAppsReminder(
             context = applicationContext,
             appCount = count,
             thresholdDays = settings.unusedAppThresholdDays,
+            totalBytes = result.reclaimableBytes,
         )
         app.settings.recordReminderSent(now, unusedAppCount = count)
         return true
     }
 
-    private suspend fun remindAboutCleanup(
-        settings: dev.sweep.core.data.SweepSettings,
-        state: ReminderState,
-        now: Long,
-    ) {
-        val app = applicationContext as SweepApplication
-        val reviewable = state.lastScanFoundBytes
-        if (reviewable < settings.reminderThresholdBytes) return
-        // Already mentioned this exact figure. Repeating it is nagging, not reminding.
-        if (reviewable == state.lastNotifiedBytes) return
-
-        SweepNotifications.showCleanupReminder(applicationContext, reviewable)
-        app.settings.recordReminderSent(now, notifiedBytes = reviewable)
-    }
-
     companion object {
         private const val WORK_NAME = "sweep_reminders"
-        private val COOLDOWN_MS = TimeUnit.DAYS.toMillis(6)
 
         /**
          * Weekly, inexact, and only when the battery is not already low. WorkManager decides the

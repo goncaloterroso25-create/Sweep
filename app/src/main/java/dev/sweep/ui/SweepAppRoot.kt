@@ -1,64 +1,67 @@
 package dev.sweep.ui
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import dev.sweep.core.android.SweepNotifications
 import dev.sweep.core.model.CleanupCategory
-import dev.sweep.ui.components.ConfirmCleanSheet
-import dev.sweep.ui.components.SelectionBar
+import dev.sweep.core.scan.SafetyPolicy
+import dev.sweep.ui.components.SweepHaptics
 import dev.sweep.ui.components.rememberHaptics
-import dev.sweep.ui.screens.CacheScreen
-import dev.sweep.ui.screens.CategoryScreen
-import dev.sweep.ui.screens.CompletionScreen
+import dev.sweep.ui.screens.AppsScreen
+import dev.sweep.ui.screens.AppsTab
+import dev.sweep.ui.screens.DeleteSheet
 import dev.sweep.ui.screens.HomeScreen
-import dev.sweep.ui.screens.OnboardingScreen
+import dev.sweep.ui.screens.ReviewScreen
 import dev.sweep.ui.screens.SettingsScreen
-import dev.sweep.ui.screens.UnusedAppsScreen
 import dev.sweep.ui.theme.LocalReducedMotion
 import dev.sweep.ui.theme.Sweep
+import dev.sweep.ui.theme.SweepMotion
 import dev.sweep.ui.theme.SweepTheme
 
 private object Routes {
-    const val ONBOARDING = "onboarding"
     const val HOME = "home"
-    const val CATEGORY = "category/{category}"
-    const val APPS = "apps"
-    const val CACHE = "cache"
+    const val REVIEW = "review/{category}"
+    const val APPS = "apps/{tab}"
     const val SETTINGS = "settings"
 
-    fun category(category: CleanupCategory) = "category/${category.name}"
+    fun review(category: CleanupCategory) = "review/${category.name}"
+    fun apps(tab: AppsTab) = "apps/${tab.name}"
 }
 
 /**
- * The whole navigation graph — six destinations, no tab bar.
+ * Four destinations and one sheet.
  *
- * The selection toolbar and the confirmation sheet live above the graph rather than inside any
- * one screen, so a selection survives moving between Home and a category, and there is exactly
- * one path to a deletion no matter where the user started.
+ * Home is where a session starts and ends. A category opens for review, Apps and Settings are
+ * their own places, and the delete sheet lives above all of them, so there is exactly one path to
+ * a deletion however the user got there. After a delete the app returns to Home, because that is
+ * where the storage picture is, and the point of deleting was to change it.
  */
 @Composable
 fun SweepAppRoot(
@@ -71,7 +74,8 @@ fun SweepAppRoot(
 
     SweepTheme(motionPreference = state.settings.motion) {
         val colors = Sweep.colors
-
+        // The splash screen stays up until settings have loaded, so nothing is drawn with the
+        // wrong motion preference and there is never a blank frame to cover here.
         if (!state.settingsLoaded) {
             Box(Modifier.fillMaxSize().background(colors.base))
             return@SweepTheme
@@ -79,32 +83,14 @@ fun SweepAppRoot(
 
         val navController = rememberNavController()
         val haptics = rememberHaptics(state.settings.hapticsEnabled)
-        var confirming by remember { mutableStateOf(false) }
+        var confirming by rememberSaveable { mutableStateOf(false) }
 
-        // One tick when a scan resolves. Nothing during the scan itself: a buzz per discovery
-        // would turn a thirty-second scan into a pocket full of noise.
-        var wasScanning by remember { mutableStateOf(false) }
-        LaunchedEffect(state.stage) {
-            if (state.stage == Stage.SCANNING) {
-                wasScanning = true
-            } else if (wasScanning && state.stage == Stage.RESULTS) {
-                wasScanning = false
-                haptics.tick()
-            }
-        }
+        StageHaptics(state, haptics)
 
-        val startDestination = remember {
-            if (state.settings.onboardingComplete) Routes.HOME else Routes.ONBOARDING
-        }
-
-        // A tapped reminder goes straight to the screen it was about, but never over the top of
-        // onboarding: someone who has not finished setting the app up is not who it was for.
-        LaunchedEffect(openDestination, state.settings.onboardingComplete) {
-            if (openDestination == SweepNotifications.DESTINATION_UNUSED_APPS &&
-                state.settings.onboardingComplete
-            ) {
+        LaunchedEffect(openDestination) {
+            if (openDestination == SweepNotifications.DESTINATION_UNUSED_APPS) {
                 viewModel.loadApps()
-                navController.navigate(Routes.APPS) { launchSingleTop = true }
+                navController.navigate(Routes.apps(AppsTab.UNUSED)) { launchSingleTop = true }
                 onDestinationHandled()
             }
         }
@@ -112,53 +98,23 @@ fun SweepAppRoot(
         Box(Modifier.fillMaxSize().background(colors.base)) {
             SweepNavHost(
                 navController = navController,
-                startDestination = startDestination,
                 state = state,
                 viewModel = viewModel,
                 haptics = haptics,
+                onReview = { confirming = true },
             )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter),
-            ) {
-                SelectionBar(
-                    visible = state.stage == Stage.RESULTS && state.selectedCount > 0,
-                    count = state.selectedCount,
-                    bytes = state.selectedBytes,
-                    onClear = { viewModel.clearSelection() },
-                    // No haptic here: this opens the confirmation sheet, it does not confirm
-                    // anything. The tick belongs on the button that actually deletes.
-                    onClean = { confirming = true },
-                )
-            }
-
-            AnimatedVisibility(
-                visible = state.stage == Stage.DONE && state.cleanup != null,
-                enter = fadeIn(tween(220)) + scaleIn(initialScale = 1.03f, animationSpec = tween(320)),
-                exit = fadeOut(tween(180)),
-            ) {
-                state.cleanup?.let { summary ->
-                    CompletionScreen(
-                        summary = summary,
-                        storage = state.storage,
-                        haptics = haptics,
-                        onDone = {
-                            viewModel.dismissCompletion()
-                            navController.popBackStack(Routes.HOME, inclusive = false)
-                        },
-                    )
-                }
-            }
         }
 
-        if (confirming) {
-            ConfirmCleanSheet(
+        if (confirming && state.selection.count > 0) {
+            DeleteSheet(
                 items = state.selectedItems,
+                lastCopies = remember(state.items, state.selectedPaths) {
+                    SafetyPolicy.groupsLeftWithoutACopy(state.items, state.selectedPaths)
+                },
                 onConfirm = {
                     confirming = false
                     haptics.confirm()
+                    navController.popBackStack(Routes.HOME, inclusive = false)
                     viewModel.runCleanup()
                 },
                 onDismiss = { confirming = false },
@@ -167,118 +123,124 @@ fun SweepAppRoot(
     }
 }
 
+/**
+ * Haptics are rationed so the few that remain mean something: one tick when a scan resolves, and
+ * one confirmation when a delete has finished and something was actually removed. Nothing while a
+ * scan runs; a buzz per discovery would turn a long scan into a pocket full of noise.
+ */
+@Composable
+private fun StageHaptics(state: SweepUiState, haptics: SweepHaptics) {
+    var previous by remember { mutableStateOf(state.stage) }
+    LaunchedEffect(state.stage) {
+        when {
+            previous == Stage.SCANNING && state.stage == Stage.RESULTS -> haptics.tick()
+            previous == Stage.CLEANING && state.stage == Stage.DONE -> {
+                if ((state.cleanup?.filesRemoved ?: 0) > 0) haptics.confirm() else haptics.reject()
+            }
+        }
+        previous = state.stage
+    }
+}
+
 @Composable
 private fun SweepNavHost(
     navController: NavHostController,
-    startDestination: String,
     state: SweepUiState,
     viewModel: SweepViewModel,
-    haptics: dev.sweep.ui.components.SweepHaptics,
+    haptics: SweepHaptics,
+    onReview: () -> Unit,
 ) {
     val reduced = LocalReducedMotion.current
-    val shift: (Int) -> Int = { it / 6 }
+    val distance = with(LocalDensity.current) { 36.dp.roundToPx() }
+
+    // Forward travels in from the right, as Android does everywhere; back returns the way it came.
+    // Reduced motion keeps the cross-fade and drops the travel.
+    val enter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
+        if (reduced) fadeIn(tween(SweepMotion.REDUCED_FADE))
+        else slideInHorizontally(spring(dampingRatio = 1f, stiffness = 520f, visibilityThreshold = IntOffset(1, 1))) { distance } +
+            fadeIn(tween(SweepMotion.BASE, 40, SweepMotion.Standard))
+    }
+    val exit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
+        if (reduced) fadeOut(tween(SweepMotion.REDUCED_FADE))
+        else slideOutHorizontally(tween(SweepMotion.BASE, easing = SweepMotion.Standard)) { -distance / 3 } +
+            fadeOut(tween(SweepMotion.QUICK))
+    }
+    val popEnter: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition = {
+        if (reduced) fadeIn(tween(SweepMotion.REDUCED_FADE))
+        else slideInHorizontally(spring(dampingRatio = 1f, stiffness = 520f, visibilityThreshold = IntOffset(1, 1))) { -distance / 3 } +
+            fadeIn(tween(SweepMotion.BASE, 40, SweepMotion.Standard))
+    }
+    val popExit: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition = {
+        if (reduced) fadeOut(tween(SweepMotion.REDUCED_FADE))
+        else slideOutHorizontally(tween(SweepMotion.BASE, easing = SweepMotion.Clear)) { distance } +
+            fadeOut(tween(SweepMotion.QUICK))
+    }
 
     NavHost(
         navController = navController,
-        startDestination = startDestination,
-        enterTransition = {
-            if (reduced) fadeIn(tween(1))
-            else slideInHorizontally(tween(300), shift) + fadeIn(tween(190))
-        },
-        exitTransition = {
-            if (reduced) fadeOut(tween(1))
-            else scaleOut(tween(280), targetScale = 0.97f) + fadeOut(tween(160))
-        },
-        popEnterTransition = {
-            if (reduced) fadeIn(tween(1))
-            else scaleIn(tween(300), initialScale = 0.97f) + fadeIn(tween(190))
-        },
-        popExitTransition = {
-            if (reduced) fadeOut(tween(1))
-            else slideOutHorizontally(tween(280)) { shift(it) } + fadeOut(tween(170))
-        },
+        startDestination = Routes.HOME,
+        enterTransition = enter,
+        exitTransition = exit,
+        popEnterTransition = popEnter,
+        popExitTransition = popExit,
     ) {
-        composable(Routes.ONBOARDING) {
-            OnboardingScreen(
-                permissions = state.permissions,
-                usageAccessRefused = state.usageAccessRefused,
-                onPermissionsChanged = { viewModel.refreshEnvironment() },
-                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
-                onContinue = {
-                    viewModel.completeOnboarding()
-                    navController.navigate(Routes.HOME) {
-                        popUpTo(Routes.ONBOARDING) { inclusive = true }
-                    }
-                },
-            )
-        }
-
         composable(Routes.HOME) {
             HomeScreen(
                 state = state,
-                // Starting a scan is not a selection or a confirmation, so it gets no haptic.
-                // Rationing them is what keeps the four that remain meaningful.
                 onScan = viewModel::startScan,
-                onCancelScan = { viewModel.cancelScan() },
-                onRescan = viewModel::startScan,
-                onOpenCategory = { navController.navigate(Routes.category(it)) },
-                onOpenApps = {
+                onStop = viewModel::stopScan,
+                onPermissionsChanged = viewModel::refreshEnvironment,
+                onOpenCategory = { navController.navigate(Routes.review(it)) },
+                onOpenApps = { cache ->
                     viewModel.loadApps()
-                    navController.navigate(Routes.APPS)
-                },
-                onOpenCache = {
-                    viewModel.loadApps()
-                    navController.navigate(Routes.CACHE)
+                    navController.navigate(Routes.apps(if (cache) AppsTab.CACHE else AppsTab.UNUSED))
                 },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                onReview = onReview,
+                onClearSelection = { viewModel.clearSelection() },
+                onDismissReceipt = viewModel::dismissReceipt,
+                onLoadApps = { viewModel.loadApps() },
             )
         }
 
-        composable(Routes.CATEGORY) { entry ->
-            val category = entry.arguments
-                ?.getString("category")
+        composable(Routes.REVIEW) { entry ->
+            val category = entry.arguments?.getString("category")
                 ?.let { name -> CleanupCategory.entries.firstOrNull { it.name == name } }
-
             if (category == null) {
                 LaunchedEffect(Unit) { navController.popBackStack() }
             } else {
-                CategoryScreen(
+                ReviewScreen(
                     category = category,
                     state = state,
                     haptics = haptics,
                     onBack = { navController.popBackStack() },
                     onToggle = viewModel::toggle,
-                    onSelectSafe = { viewModel.selectSafe(category) },
-                    onSelectAll = {
-                        viewModel.setSelected(state.itemsIn(category).map { it.path }, true)
-                    },
+                    onSelectSuggested = { viewModel.selectSuggested(category) },
+                    onSelectAll = { viewModel.setSelected(state.itemsIn(category).map { it.path }, true) },
                     onClearSelection = { viewModel.clearSelection(category) },
                     onExclude = viewModel::excludeItem,
+                    onReview = onReview,
                 )
             }
         }
 
-        composable(Routes.APPS) {
-            UnusedAppsScreen(
+        composable(Routes.APPS) { entry ->
+            val tab = entry.arguments?.getString("tab")
+                ?.let { name -> AppsTab.entries.firstOrNull { it.name == name } }
+                ?: AppsTab.UNUSED
+            AppsScreen(
                 state = state,
+                initialTab = tab,
                 loadIcon = viewModel::appIcon,
                 onBack = { navController.popBackStack() },
-                onThresholdChange = viewModel::setUnusedAppThreshold,
+                onThresholdChange = { viewModel.setUnusedAppThreshold(it) },
                 onExcludeApp = viewModel::excludeApp,
                 onUninstallReturned = viewModel::onUninstallReturned,
                 onUninstallUnavailable = viewModel::reportUninstallUnavailable,
-                onDismissNotice = viewModel::dismissAppNotice,
-                onUsageAccessRequested = viewModel::noteUsageAccessRequested,
-            )
-        }
-
-        composable(Routes.CACHE) {
-            CacheScreen(
-                state = state,
-                loadIcon = viewModel::appIcon,
-                onBack = { navController.popBackStack() },
+                onAppStorageReturned = viewModel::onAppStorageReturned,
                 onClearOwnCache = { viewModel.clearOwnCache() },
                 onRefreshOwnCache = { viewModel.refreshOwnCache() },
+                onDismissNotice = viewModel::dismissAppNotice,
                 onUsageAccessRequested = viewModel::noteUsageAccessRequested,
             )
         }
@@ -288,17 +250,17 @@ private fun SweepNavHost(
                 state = state,
                 haptics = haptics,
                 onBack = { navController.popBackStack() },
-                onOldFileThreshold = viewModel::setOldFileThreshold,
-                onLargeFileThreshold = viewModel::setLargeFileThreshold,
-                onScreenshotThreshold = viewModel::setScreenshotThreshold,
-                onUnusedAppThreshold = viewModel::setUnusedAppThreshold,
-                onHaptics = viewModel::setHaptics,
-                onMotion = viewModel::setMotion,
+                onOldFileThreshold = { viewModel.setOldFileThreshold(it) },
+                onLargeFileThreshold = { viewModel.setLargeFileThreshold(it) },
+                onScreenshotThreshold = { viewModel.setScreenshotThreshold(it) },
+                onUnusedAppThreshold = { viewModel.setUnusedAppThreshold(it) },
+                onHaptics = { viewModel.setHaptics(it) },
+                onMotion = { viewModel.setMotion(it) },
                 onClearExclusions = { viewModel.clearExclusions() },
                 onUsageAccessRequested = viewModel::noteUsageAccessRequested,
-                onCleanupReminders = viewModel::setCleanupReminders,
-                onUnusedAppReminders = viewModel::setUnusedAppReminders,
-                onReminderThreshold = viewModel::setReminderThreshold,
+                onCleanupReminders = { viewModel.setCleanupReminders(it) },
+                onUnusedAppReminders = { viewModel.setUnusedAppReminders(it) },
+                onReminderThreshold = { viewModel.setReminderThreshold(it) },
             )
         }
     }

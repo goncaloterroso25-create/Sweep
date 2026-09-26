@@ -1,6 +1,6 @@
 # Play Store readiness
 
-Where Sweep actually stands against Google Play policy, as of August 2026.
+Where Sweep actually stands against Google Play policy, as of September 2026 and v0.6.0.
 
 Short version: the build requirements are met, and the permission requirements are the problem. Two of Sweep's permissions need a Permissions Declaration Form and a review decision that nobody can predict from the outside. Meeting policy is not the same as being approved.
 
@@ -10,12 +10,13 @@ Short version: the build requirements are met, and the permission requirements a
 
 | Requirement | Status |
 | --- | --- |
-| Target API level | **Met.** `targetSdk 36`. Play requires API 36 for new apps and updates from 31 August 2026. |
+| Target API level | **Met.** `targetSdk 36`. Play has required API 36 for new apps and updates since 31 August 2026. |
 | Compile SDK | `compileSdk 36`, with AGP 8.10.1 and Gradle 8.11.1. |
 | App Bundle | **Met.** `./gradlew releaseBundleInfo` produces a signed `.aab`. Play has required bundles for new apps since August 2021. |
 | Play App Signing | Required for new apps. The key in `keystore.properties` becomes the *upload* key; Play holds the app signing key and re-signs every download. |
 | 64-bit | **Met.** No native code of Sweep's own. The two bundled `.so` files come from AndroidX and ship all four ABIs. |
 | Notification permission | **Met.** `POST_NOTIFICATIONS` is requested at the moment a reminder is switched on, never at launch. |
+| Release hygiene | Verbose, debug and info logging stripped by R8. No signing material in the repository. v0.6 added one runtime library, `androidx.core:core-splashscreen`, and no permissions; the merged permission set is identical to v0.5. |
 
 ---
 

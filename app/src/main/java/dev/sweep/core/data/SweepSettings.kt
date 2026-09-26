@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dev.sweep.core.model.ScanConfig
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -33,7 +34,6 @@ data class SweepSettings(
     val unusedAppThresholdDays: Int = 90,
     val hapticsEnabled: Boolean = true,
     val motion: MotionPreference = MotionPreference.STANDARD,
-    val onboardingComplete: Boolean = false,
     val excludedPaths: Set<String> = emptySet(),
     val excludedPackages: Set<String> = emptySet(),
     /** Both reminders default to off. Nothing is scheduled until the user asks for it. */
@@ -60,10 +60,20 @@ data class SweepSettings(
  */
 data class ReminderState(
     val lastScanFoundBytes: Long = 0L,
+    /** When that scan ran. Zero if the user has never scanned. */
+    val lastScanAt: Long = 0L,
     val lastNotifiedAt: Long = 0L,
     val lastNotifiedBytes: Long = 0L,
     val lastUnusedAppCount: Int = -1,
+    /** The last time Sweep was in the foreground. Someone who was just here needs no reminder. */
+    val lastOpenedAt: Long = 0L,
 )
+
+/**
+ * What the last real scan found and when, shown on Home as history. It is never presented as the
+ * current state of the device, because it is not.
+ */
+data class LastScan(val foundBytes: Long, val at: Long)
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "sweep")
 
@@ -85,7 +95,6 @@ class SweepSettingsStore(private val context: Context) {
             motion = prefs[MOTION]
                 ?.let { runCatching { MotionPreference.valueOf(it) }.getOrNull() }
                 ?: MotionPreference.STANDARD,
-            onboardingComplete = prefs[ONBOARDING] ?: false,
             excludedPaths = prefs[EXCLUDED_PATHS] ?: emptySet(),
             excludedPackages = prefs[EXCLUDED_PACKAGES] ?: emptySet(),
             cleanupReminders = prefs[CLEANUP_REMINDERS] ?: false,
@@ -100,18 +109,37 @@ class SweepSettingsStore(private val context: Context) {
     suspend fun currentReminderState(): ReminderState = context.dataStore.data.map { prefs ->
         ReminderState(
             lastScanFoundBytes = prefs[LAST_SCAN_BYTES] ?: 0L,
+            lastScanAt = prefs[LAST_SCAN_AT] ?: 0L,
             lastNotifiedAt = prefs[LAST_NOTIFIED_AT] ?: 0L,
             lastNotifiedBytes = prefs[LAST_NOTIFIED_BYTES] ?: 0L,
             lastUnusedAppCount = prefs[LAST_UNUSED_COUNT] ?: -1,
+            lastOpenedAt = prefs[LAST_OPENED_AT] ?: 0L,
         )
     }.first()
 
-    /** Recorded when a real scan finishes, and reset to zero when a cleanup empties the list. */
-    suspend fun recordScanResult(reviewableBytes: Long) = put {
+    /** Null until the first scan has finished. */
+    val lastScan: Flow<LastScan?> = context.dataStore.data.map { prefs ->
+        val at = prefs[LAST_SCAN_AT] ?: 0L
+        if (at <= 0L) null else LastScan(foundBytes = prefs[LAST_SCAN_BYTES] ?: 0L, at = at)
+    }.distinctUntilChanged()
+
+    /** Recorded when a real scan finishes. */
+    suspend fun recordScanResult(reviewableBytes: Long, at: Long) = put {
         it[LAST_SCAN_BYTES] = reviewableBytes
+        it[LAST_SCAN_AT] = at
         // A fresh measurement makes the previously notified figure irrelevant.
         it[LAST_NOTIFIED_BYTES] = 0L
     }
+
+    /**
+     * What is left of the last scan's findings after a cleanup or an exclusion. Without this the
+     * reminder would go on quoting space the user had already reclaimed.
+     */
+    suspend fun updateScanFoundBytes(remainingBytes: Long) = put {
+        if ((it[LAST_SCAN_AT] ?: 0L) > 0L) it[LAST_SCAN_BYTES] = remainingBytes
+    }
+
+    suspend fun recordAppOpened(at: Long) = put { it[LAST_OPENED_AT] = at }
 
     suspend fun recordReminderSent(
         at: Long,
@@ -123,6 +151,9 @@ class SweepSettingsStore(private val context: Context) {
         unusedAppCount?.let { prefs[LAST_UNUSED_COUNT] = it }
     }
 
+    /** The unused-app count is remembered even when nothing is sent, so a fall is not news later. */
+    suspend fun recordUnusedAppCount(count: Int) = put { it[LAST_UNUSED_COUNT] = count }
+
     suspend fun setCleanupReminders(enabled: Boolean) = put { it[CLEANUP_REMINDERS] = enabled }
     suspend fun setUnusedAppReminders(enabled: Boolean) = put { it[UNUSED_APP_REMINDERS] = enabled }
     suspend fun setReminderThreshold(bytes: Long) = put { it[REMINDER_THRESHOLD] = bytes }
@@ -133,22 +164,13 @@ class SweepSettingsStore(private val context: Context) {
     suspend fun setUnusedAppThreshold(days: Int) = put { it[UNUSED_APP_DAYS] = days }
     suspend fun setHaptics(enabled: Boolean) = put { it[HAPTICS] = enabled }
     suspend fun setMotion(preference: MotionPreference) = put { it[MOTION] = preference.name }
-    suspend fun setOnboardingComplete() = put { it[ONBOARDING] = true }
 
     suspend fun excludePath(path: String) = put {
         it[EXCLUDED_PATHS] = (it[EXCLUDED_PATHS] ?: emptySet()) + path
     }
 
-    suspend fun includePath(path: String) = put {
-        it[EXCLUDED_PATHS] = (it[EXCLUDED_PATHS] ?: emptySet()) - path
-    }
-
     suspend fun excludePackage(packageName: String) = put {
         it[EXCLUDED_PACKAGES] = (it[EXCLUDED_PACKAGES] ?: emptySet()) + packageName
-    }
-
-    suspend fun includePackage(packageName: String) = put {
-        it[EXCLUDED_PACKAGES] = (it[EXCLUDED_PACKAGES] ?: emptySet()) - packageName
     }
 
     suspend fun clearExclusions() = put {
@@ -167,15 +189,16 @@ class SweepSettingsStore(private val context: Context) {
         val UNUSED_APP_DAYS = intPreferencesKey("unused_app_days")
         val HAPTICS = booleanPreferencesKey("haptics")
         val MOTION = stringPreferencesKey("motion")
-        val ONBOARDING = booleanPreferencesKey("onboarding_complete")
         val EXCLUDED_PATHS = stringSetPreferencesKey("excluded_paths")
         val EXCLUDED_PACKAGES = stringSetPreferencesKey("excluded_packages")
         val CLEANUP_REMINDERS = booleanPreferencesKey("cleanup_reminders")
         val UNUSED_APP_REMINDERS = booleanPreferencesKey("unused_app_reminders")
         val REMINDER_THRESHOLD = longPreferencesKey("reminder_threshold_bytes")
         val LAST_SCAN_BYTES = longPreferencesKey("last_scan_found_bytes")
+        val LAST_SCAN_AT = longPreferencesKey("last_scan_at")
         val LAST_NOTIFIED_AT = longPreferencesKey("last_notified_at")
         val LAST_NOTIFIED_BYTES = longPreferencesKey("last_notified_bytes")
         val LAST_UNUSED_COUNT = intPreferencesKey("last_unused_app_count")
+        val LAST_OPENED_AT = longPreferencesKey("last_opened_at")
     }
 }

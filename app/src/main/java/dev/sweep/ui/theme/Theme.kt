@@ -18,14 +18,20 @@ import dev.sweep.core.data.MotionPreference
 
 val LocalSweepColors = staticCompositionLocalOf { DarkColors }
 
-/** Corner radii climb with surface importance. Only the primary action is a full pill. */
-val SweepShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp),
-    small = RoundedCornerShape(11.dp),
-    medium = RoundedCornerShape(15.dp),
-    large = RoundedCornerShape(21.dp),
-    extraLarge = RoundedCornerShape(28.dp),
-)
+/**
+ * Geometry. Sweep is mostly rows on a page, so there are few surfaces to round at all, and the
+ * ones that exist use two radii: 12 for controls and groups, 20 for sheets. The primary action
+ * is the only pill, which is what keeps it findable.
+ */
+object SweepShape {
+    val control = RoundedCornerShape(12.dp)
+    val group = RoundedCornerShape(16.dp)
+    val sheet = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
+    val thumb = RoundedCornerShape(9.dp)
+}
+
+/** The widest a column of reading content is allowed to get on a tablet or unfolded phone. */
+val MaxContentWidth = 620.dp
 
 object Sweep {
     val colors: SweepColors
@@ -51,37 +57,36 @@ fun SweepTheme(
         }.getOrDefault(false)
     }
 
-    // Standard still yields to Android: if the user has switched animations off system-wide,
-    // Sweep is not the app that argues with that. That is behaviour, not a third option.
+    // Standard still yields to Android: if animations are off system-wide, Sweep follows.
     val reducedMotion = motionPreference == MotionPreference.REDUCED || systemAnimationsOff
 
-    // Material components still need a scheme; it is derived from the Sweep palette so a stray
-    // M3 default can never introduce a colour that is not part of the design.
+    // Material components still read a scheme, so it is derived from Sweep's palette and a stray
+    // Material default can never introduce a colour that is not part of the design.
     val scheme = if (darkTheme) {
         darkColorScheme(
-            primary = colors.accent,
-            onPrimary = colors.onAccent,
-            secondary = colors.info,
+            primary = colors.signal,
+            onPrimary = colors.onSignal,
             background = colors.base,
             onBackground = colors.text,
-            surface = colors.surface,
+            surface = colors.raised,
             onSurface = colors.text,
-            surfaceVariant = colors.surfaceHigh,
+            surfaceVariant = colors.surface,
             onSurfaceVariant = colors.textMute,
+            surfaceContainer = colors.raised,
             outline = colors.line,
             error = colors.danger,
         )
     } else {
         lightColorScheme(
-            primary = colors.accent,
-            onPrimary = colors.onAccent,
-            secondary = colors.info,
+            primary = colors.signalInk,
+            onPrimary = colors.raised,
             background = colors.base,
             onBackground = colors.text,
-            surface = colors.surface,
+            surface = colors.raised,
             onSurface = colors.text,
-            surfaceVariant = colors.surfaceHigh,
+            surfaceVariant = colors.surface,
             onSurfaceVariant = colors.textMute,
+            surfaceContainer = colors.raised,
             outline = colors.line,
             error = colors.danger,
         )
@@ -94,7 +99,13 @@ fun SweepTheme(
         MaterialTheme(
             colorScheme = scheme,
             typography = SweepTypography,
-            shapes = SweepShapes,
+            shapes = Shapes(
+                extraSmall = SweepShape.control,
+                small = SweepShape.control,
+                medium = SweepShape.control,
+                large = SweepShape.group,
+                extraLarge = SweepShape.group,
+            ),
             content = content,
         )
     }

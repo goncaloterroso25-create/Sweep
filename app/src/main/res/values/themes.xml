@@ -1,14 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-      Compose draws everything; this theme exists only so the window that appears before the
-      first frame is already the right colour, and so the system bars are transparent for the
-      edge-to-edge layout.
+      Compose draws everything; this theme exists so the window behind the first frame is already
+      the right colour, and so the system bars are transparent for the edge-to-edge layout.
     -->
     <style name="Theme.Sweep" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/sweep_base</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+    <!--
+      The launch window. The mark sits on the launcher icon's own ink disc over the page colour, so
+      the splash is the icon the user just tapped, arriving, and the page behind it is already
+      the page Home draws on. Android keeps it on screen only until Home can draw its real first
+      frame.
+    -->
+    <style name="Theme.Sweep.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/sweep_base</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/sweep_ink</item>
+        <item name="postSplashScreenTheme">@style/Theme.Sweep</item>
     </style>
 </resources>

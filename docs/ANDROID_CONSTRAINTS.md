@@ -31,7 +31,7 @@ one in `Download/` through MediaStore, and you cannot enumerate arbitrary archiv
 Because the permission is granted in Settings and not by a dialog, `MainActivity.onResume()`
 re-reads it every time. Sweep never assumes it still has access.
 
-If it is denied, the app opens normally, the scan button is disabled, and a card explains what is
+If it is denied, the app opens normally and Home asks for it in place of the scan button, saying what is
 unavailable. `Android/`, `.thumbnails`, `LOST.DIR` and any folder containing `.nomedia` are skipped
 by the scanner regardless of permission — those belong to other apps.
 
@@ -104,13 +104,14 @@ subtracts it rather than counting those bytes twice.
 **The constraint.** No third-party app can silently uninstall another. `PackageInstaller.uninstall()`
 requires `REQUEST_DELETE_PACKAGES` and still shows a system dialog.
 
-**What Sweep does.** Launches `Intent.ACTION_DELETE` with a `package:` URI — which needs no extra
-permission at all — through an activity-result launcher, then reloads the package list on return
-and reports what actually happened. The result code from the uninstall dialog is unreliable across
-OEMs; re-reading the package list is not.
+**What Sweep does.** Launches `Intent.ACTION_UNINSTALL_PACKAGE` (declaring `REQUEST_DELETE_PACKAGES`,
+without which some devices drop the request silently), falling back to `ACTION_DELETE` and then to
+the app's settings page. When the dialog returns, Sweep asks the package manager directly whether
+the package still exists and reports only that. The dialog's result code is used for nothing but
+telling a failure apart from a cancel; re-reading the package list is what settles it.
 
-The UI says so in as many words: _"Android runs the uninstall. Sweep opens the system dialog and
-checks afterwards whether the app is really gone."_
+The Apps screen says so plainly: Android shows its own confirmation and does the uninstalling, and
+Sweep checks afterwards that the app is really gone before saying so.
 
 ---
 
@@ -120,17 +121,19 @@ checks afterwards whether the app is really gone."_
 app's cache. `PackageManager.deleteApplicationCacheFiles()` is `@hide` and system-only.
 `freeStorageAndNotify()` requires the privileged `CLEAR_APP_CACHE` permission.
 
-**What Sweep does — all four of these are real:**
+**What Sweep does.** Three things, all real:
 
 1. Reads per-app `cacheBytes` via `StorageStatsManager` (needs Usage Access) so you can see where
    the space is.
-2. On Android 12+ (API 31), opens `StorageManager.ACTION_CLEAR_APP_CACHE` — a genuine system
-   dialog that clears cached data across all apps. **Android** performs and confirms the work.
-3. Opens a specific app's storage page via `ACTION_APPLICATION_DETAILS_SETTINGS`.
-4. Clears its own cache — the only cache it owns — and shows the figure alongside the others
-   precisely so the difference between "Sweep did this" and "Android did this" stays visible.
+2. Opens a specific app's page via `ACTION_APPLICATION_DETAILS_SETTINGS`, where Android's own
+   Storage screen has the clear button. When the user comes back, Sweep measures that app again
+   and reports the change only if the figure actually went down.
+3. Clears its own cache, the only cache it owns, and shows it separately so the difference between
+   "Sweep did this" and "Android did this" stays visible.
 
-Below API 31 there is no bulk system dialog, so Sweep opens storage settings and says why.
+Android 12's bulk `StorageManager.ACTION_CLEAR_APP_CACHE` dialog was offered up to v0.4 and removed
+in v0.5: on the phones it was tested on it either did nothing or opened an unrelated screen, and a
+button whose behaviour depends on the manufacturer is worse than no button.
 
 At no point does Sweep report another app's cache as space *it* recovered.
 
@@ -152,20 +155,20 @@ at paths.
 
 ---
 
-## 8. Blur and translucency
+## 8. Launch
 
-**The constraint.** Android has no backdrop-blur primitive for an ordinary composable inside the
-view tree. `RenderEffect` blurs a view's *own* content. Real backdrop blur exists only at the
-window level, from API 31, and the system may disable it for battery saver or low-end devices.
+**The constraint.** From Android 12 every app launches through a system splash window, and the
+`androidx.core:core-splashscreen` library gives earlier versions the same behaviour. An app can
+hold that window, or animate it away, but cannot remove it.
 
-**What Sweep does.** Floating surfaces use layered translucency with a lit top edge and a scrim
-beneath — the optics of glass at zero per-frame cost. Modal sheets, which are real windows and
-short-lived, request genuine `FLAG_BLUR_BEHIND` and check
-`WindowManager.isCrossWindowBlurEnabled` first, degrading silently to the translucent surface.
+**What Sweep does.** Uses it rather than adding a screen of its own. The splash shows the launcher
+mark on its ink disc over the page colour, and is held only until settings and the first storage
+reading exist, never longer than 700 ms. It then lifts in about a quarter of a second, with the
+mark carried off to the right. With reduced motion, or animations off in Android, it simply goes.
+Warm and hot starts that show no splash have nothing to replay.
 
-This is a deliberate trade: a blur library would give truer glass and cost a full-screen render
-pass on every frame of every scroll, which is the wrong bet for an app whose main promise is that
-it feels fast.
+Earlier versions also used window-level blur behind sheets. v0.6 dropped it: the redesign uses
+solid surfaces throughout, so there was nothing left for blur to do.
 
 ---
 
@@ -176,9 +179,8 @@ it feels fast.
 | File access | runtime R/W | legacy flag | All files access | All files access |
 | `Android/data` readable | yes | yes | **no** | **no** |
 | Package list | full | full | needs `QUERY_ALL_PACKAGES` | same |
-| Bulk cache dialog | — | — | — | ✅ `ACTION_CLEAR_APP_CACHE` |
 | Volume directories | primary only | primary only | ✅ `getDirectory()` | ✅ |
-| Window blur | — | — | — | ✅ if enabled |
+| Splash screen | compat library | compat library | compat library | platform |
 | `lastTimeVisible` | — | ✅ (29+) | ✅ | ✅ |
 
 ---
